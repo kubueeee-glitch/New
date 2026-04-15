@@ -435,7 +435,7 @@ body{font-family:var(--fb);background:var(--bg);color:var(--t1);overscroll-behav
     <div class="ai-chat" id="ai-chat"></div>
     <div class="ai-inp-bar">
       <div class="ai-irow">
-        <textarea class="ai-ta" id="ai-ta" placeholder="Zapytaj AI Coacha..." rows="1" maxlength="600"></textarea>
+        <textarea class="ai-ta" id="ai-ta" placeholder="Napisz wiadomość do Benedykta..." rows="1" maxlength="600"></textarea>
         <button class="ai-snd" id="ai-snd" onclick="sendMsg()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
@@ -494,7 +494,7 @@ body{font-family:var(--fb);background:var(--bg);color:var(--t1);overscroll-behav
     </button>
     <button class="nb" id="nb-ai" onclick="switchTab('ai')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4v1h1a3 3 0 013 3v6a3 3 0 01-3 3H7a3 3 0 01-3-3V10a3 3 0 013-3h1V6a4 4 0 014-4z"/><circle cx="9" cy="13" r="1" fill="currentColor"/><circle cx="15" cy="13" r="1" fill="currentColor"/></svg>
-      <span>AI Coach</span><div class="nbdot"></div>
+      <span>Benedykt</span><div class="nbdot"></div>
     </button>
     <button class="nb" id="nb-cust" onclick="switchTab('cust')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -623,7 +623,10 @@ let settings=JSON.parse(localStorage.getItem('hf5_s')||JSON.stringify({
   radius:'18px',radiusId:'rounded',
   density:'normal',
   showOrbs:true,showStreakChip:true,
+  apiKey:'',aiModel:'claude-sonnet-4-20250514',
 }));
+if(settings.apiKey===undefined)settings.apiKey='';
+if(!settings.aiModel)settings.aiModel='claude-sonnet-4-20250514';
 let convs=JSON.parse(localStorage.getItem('hf5_convs')||JSON.stringify([{id:'c1',name:'Ogólny',msgs:[],created:Date.now()}]));
 let activeConv=convs[0].id;
 let editingId=null,activeFilter='all';
@@ -1013,7 +1016,8 @@ function renderAiChat(){
   const conv=getConv();const area=document.getElementById('ai-chat');area.innerHTML='';
   if(!conv.msgs.length){
     const w=document.createElement('div');w.className='ai-welcome';
-    w.innerHTML=`<div class="ai-av">🤖</div><h2>AI Coach</h2><p>Pytaj o porady i plany nawyków. Mogę też <strong>dodawać nawyki</strong> bezpośrednio do Twojej listy!</p>`;
+    const hasKey=settings.apiKey&&settings.apiKey.trim().length>10;
+    w.innerHTML=`<div class="ai-av">🧘</div><h2>Benedykt</h2><p>Cześć ${settings.name}! Jestem Benedykt — Twój osobisty coach nawyków. Porozmawiaj ze mną o celach, motywacji lub poproś o plan. Mogę też <strong>dodawać nawyki</strong> wprost do Twojej listy.</p>${hasKey?'':'<div style="margin-top:14px;padding:12px;background:color-mix(in srgb,var(--a2) 12%,transparent);border:1px solid color-mix(in srgb,var(--a2) 30%,transparent);border-radius:12px;font-size:12px;color:var(--t1);line-height:1.5"><strong>🔑 Wymagany klucz API</strong><br>Żeby realnie rozmawiać z Benedyktem, dodaj swój klucz Anthropic API w zakładce <strong>Ja</strong>. Klucz jest zapisywany tylko lokalnie, w Twojej przeglądarce.</div>'}`;
     area.appendChild(w);
     const qps=document.createElement('div');qps.className='qps';
     QPS.forEach(p=>{const el=document.createElement('button');el.className='qp';el.innerHTML=`<span style="margin-right:7px">${p.i}</span><span class="qp-txt">${p.t}</span>`;el.onclick=()=>{document.getElementById('ai-ta').value=p.t;sendMsg();};qps.appendChild(el);});
@@ -1031,7 +1035,7 @@ function buildMsgEl(msg){
       ${msg.suggestedHabits.map((h,i)=>`<div class="aac-habit"><span class="aac-ic">${h.emoji}</span><span class="aac-n">${h.name}</span><span class="aac-cat">${h.cat}</span><button class="aac-add" id="${cid}-${i}" onclick="addSugH(${JSON.stringify(h).replace(/"/g,'&quot;')},'${cid}-${i}')">+ Dodaj</button></div>`).join('')}
       <button class="aac-addall" onclick="addAllH(${JSON.stringify(msg.suggestedHabits).replace(/"/g,'&quot;')},'${cid}')">✅ Dodaj wszystkie</button></div>`;
   }
-  div.innerHTML=msg.role==='ai'?`<div class="mav mav-ai">🤖</div><div>${content}</div>`:`<div class="mav mav-u">👤</div><div>${content}</div>`;
+  div.innerHTML=msg.role==='ai'?`<div class="mav mav-ai">🧘</div><div>${content}</div>`:`<div class="mav mav-u">👤</div><div>${content}</div>`;
   return div;
 }
 function addSugH(h,btnId){
@@ -1047,24 +1051,60 @@ function addAllH(list,cid){
 }
 async function sendMsg(){
   const ta=document.getElementById('ai-ta');const text=ta.value.trim();if(!text)return;
+  const btn=document.getElementById('ai-snd');
+  if(!settings.apiKey||settings.apiKey.trim().length<10){
+    showToast('🔑 Dodaj klucz API w zakładce "Ja"');
+    switchTab('me');
+    setTimeout(()=>editApiKey(),400);
+    return;
+  }
   ta.value='';ta.style.height='auto';
   const conv=getConv();conv.msgs.push({role:'user',content:text,ts:Date.now()});save();renderAiChat();
-  const btn=document.getElementById('ai-snd');btn.disabled=true;
+  btn.disabled=true;
   const area=document.getElementById('ai-chat');
-  const typEl=document.createElement('div');typEl.className='typind';typEl.innerHTML=`<div class="mav mav-ai">🤖</div><div class="tdots"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;
+  const typEl=document.createElement('div');typEl.className='typind';typEl.innerHTML=`<div class="mav mav-ai">🧘</div><div class="tdots"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;
   area.appendChild(typEl);area.scrollTop=area.scrollHeight;
   const t=todayKey(),done=completions[t]||{};
-  const sys=`Jesteś AI Coachem w HabitFlow. Mówisz po polsku, jesteś motywujący i konkretny.
-Gdy użytkownik prosi o nawyki/plan, zwróć HABITS_JSON:[{...}] na końcu odpowiedzi.
-Format: {"name":"Nazwa","emoji":"🎯","color":"v","cat":"Kategoria","freq":"daily"}
+  const sys=`Nazywasz się Benedykt — ciepły, mądry i konkretny coach nawyków w aplikacji HabitFlow.
+Twoja osobowość: spokojny, wspierający, lekko filozoficzny, ale praktyczny. Mówisz po polsku, po imieniu do użytkownika (${settings.name}). Używasz emoji oszczędnie, ale trafnie. Nie prawisz suchych formułek — rozmawiasz jak dobry przyjaciel i mentor.
+Pamiętasz kontekst rozmowy i odwołujesz się do wcześniejszych wiadomości.
+
+Gdy użytkownik prosi o propozycje nawyków lub plan, dołącz na KOŃCU wiadomości linię:
+HABITS_JSON:[{"name":"Nazwa","emoji":"🎯","color":"v","cat":"Kategoria","freq":"daily"}, ...]
 Kolory: v=fiolet,p=różowy,c=cyjan,a=bursztyn,e=szmaragd,r=czerwony,b=błękit,o=pomarańcz
 Kategorie: ${CATS.join(',')} · Częstotliwości: daily,weekdays,weekend,3x,2x
-Profil: ${settings.name} · Nawyki: ${habits.map(h=>`${h.emoji}${h.name}`).join(',')||'brak'} · Seria: ${calcStreak()}dni · Dziś: ${habits.filter(h=>done[h.id]).length}/${habits.length}
-Odpowiadaj zwięźle (3-5 zdań), używaj emoji.`;
+Nie dodawaj HABITS_JSON, jeśli rozmowa nie dotyczy nawyków — to psuje flow.
+
+Kontekst użytkownika:
+- Imię: ${settings.name}
+- Nawyki: ${habits.map(h=>`${h.emoji}${h.name}`).join(', ')||'brak'}
+- Seria: ${calcStreak()} dni
+- Dziś wykonane: ${habits.filter(h=>done[h.id]).length}/${habits.length}
+
+Odpowiadaj naturalnie i rozmownie — tyle ile trzeba, bez zbędnej wody.`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:conv.msgs.slice(-8).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.content}))})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':settings.apiKey.trim(),
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:settings.aiModel||'claude-sonnet-4-20250514',
+        max_tokens:1024,
+        system:sys,
+        messages:conv.msgs.slice(-16).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.content}))
+      })
+    });
+    if(!res.ok){
+      const errData=await res.json().catch(()=>({error:{message:'HTTP '+res.status}}));
+      const errMsg=errData?.error?.message||('HTTP '+res.status);
+      throw new Error(errMsg);
+    }
     const data=await res.json();
-    let txt=data.content?.map(b=>b.text||'').join('')||'Błąd połączenia.';
+    let txt=data.content?.map(b=>b.text||'').join('')||'…';
     let sug=null;const match=txt.match(/HABITS_JSON:(\[[\s\S]*?\])/);
     if(match){try{sug=JSON.parse(match[1]);}catch(e){}txt=txt.replace(/HABITS_JSON:\[[\s\S]*?\]/,'').trim();}
     typEl.remove();const aiMsg={role:'ai',content:txt,ts:Date.now(),suggestedHabits:sug};
@@ -1072,7 +1112,10 @@ Odpowiadaj zwięźle (3-5 zdań), używaj emoji.`;
     document.getElementById('ai-chat').appendChild(buildMsgEl(aiMsg));
     document.getElementById('ai-chat').scrollTop=document.getElementById('ai-chat').scrollHeight;
   }catch(err){
-    typEl.remove();const e={role:'ai',content:'⚠️ Błąd połączenia. Sprawdź internet i spróbuj ponownie.',ts:Date.now()};
+    typEl.remove();
+    const msg=err?.message||'nieznany błąd';
+    const friendly=/401|invalid|authentication/i.test(msg)?'🔑 Klucz API jest nieprawidłowy. Sprawdź go w zakładce "Ja".':/429|rate/i.test(msg)?'⏳ Za dużo zapytań. Poczekaj chwilę i spróbuj ponownie.':/credit|balance/i.test(msg)?'💳 Brak środków na koncie Anthropic.':`⚠️ Błąd: ${msg}`;
+    const e={role:'ai',content:friendly,ts:Date.now()};
     conv.msgs.push(e);save();document.getElementById('ai-chat').appendChild(buildMsgEl(e));
   }
   btn.disabled=false;
@@ -1262,9 +1305,28 @@ function renderMe(){
       <div class="sitem" onclick="editName()"><div class="sic" style="background:color-mix(in srgb,var(--a1) 10%,transparent)">👤</div><div class="stxt"><div class="sl">Imię</div><div class="ss">${settings.name}</div></div><div class="schev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></div></div>
       <div class="sitem"><div class="sic" style="background:rgba(16,185,129,.1)">📊</div><div class="stxt"><div class="sl">Skuteczność tygodniowa</div><div class="ss">${weekPct}%</div></div></div>
       <div class="sitem"><div class="sic" style="background:rgba(245,158,11,.1)">🏆</div><div class="stxt"><div class="sl">Najlepsza seria</div><div class="ss">${Math.max(0,...habits.map(h=>getBestStreak(h.id)),0)} dni</div></div></div>
+    </div>
+    <div class="sec" style="margin-top:18px">
+      <div class="sec-hdr"><div class="sec-t">Benedykt AI</div></div>
+      <div class="sitem" onclick="editApiKey()"><div class="sic" style="background:color-mix(in srgb,var(--a2) 12%,transparent)">🔑</div><div class="stxt"><div class="sl">Klucz API (Anthropic)</div><div class="ss">${settings.apiKey&&settings.apiKey.length>10?'•••• '+settings.apiKey.slice(-4)+' — aktywny':'Kliknij, aby dodać'}</div></div><div class="schev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></div></div>
+      <div class="sitem" onclick="editModel()"><div class="sic" style="background:color-mix(in srgb,var(--a3) 12%,transparent)">🧠</div><div class="stxt"><div class="sl">Model AI</div><div class="ss">${(settings.aiModel||'claude-sonnet-4-20250514').replace('claude-','').replace('-20250514','')}</div></div><div class="schev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></div></div>
+      <div style="font-size:11px;color:var(--t3);padding:10px 14px;line-height:1.5">Klucz uzyskasz na <span style="color:color-mix(in srgb,var(--a1) 80%,white)">console.anthropic.com</span>. Zapisujemy go tylko w Twojej przeglądarce (localStorage), nigdzie nie wysyłamy.</div>
     </div>`;
 }
 function editName(){showInputModal('Twoje imię',settings.name,v=>{settings.name=v;save();renderMe();showToast('✅ Zaktualizowano');});}
+function editApiKey(){showInputModal('Klucz API (sk-ant-...)',settings.apiKey||'',v=>{settings.apiKey=v.trim();save();renderMe();showToast(settings.apiKey?'✅ Klucz zapisany':'🗑️ Klucz usunięty');});}
+function editModel(){
+  const models=[
+    {id:'claude-opus-4-5',name:'Opus 4.5 (najmądrzejszy)'},
+    {id:'claude-sonnet-4-5',name:'Sonnet 4.5 (zbalansowany)'},
+    {id:'claude-sonnet-4-20250514',name:'Sonnet 4 (domyślny)'},
+    {id:'claude-haiku-4-5-20251001',name:'Haiku 4.5 (szybki)'},
+  ];
+  const cur=settings.aiModel||'claude-sonnet-4-20250514';
+  const idx=models.findIndex(m=>m.id===cur);
+  const next=models[(idx+1)%models.length];
+  settings.aiModel=next.id;save();renderMe();showToast(`🧠 Model: ${next.name}`);
+}
 
 // ===== CONFIRM MODAL =====
 let _cfmCb=null;
