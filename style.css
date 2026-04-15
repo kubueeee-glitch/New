@@ -122,6 +122,27 @@ header{padding:calc(var(--safe-t) + 14px) 16px 12px;display:flex;align-items:cen
 .settings-body select{background:var(--surf);appearance:none;-webkit-appearance:none;cursor:pointer}
 .settings-body .danger-zone{margin-top:8px;padding-top:20px;border-top:1px solid var(--b1)}
 
+/* WAKE WORD BUTTON */
+.wake-btn.active{
+  background:rgba(16,185,129,.22);
+  border-color:#10b981;
+  color:#10b981;
+  animation:wakeRing 1.8s ease-in-out infinite;
+}
+@keyframes wakeRing{
+  0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}
+  50%    {box-shadow:0 0 0 7px rgba(16,185,129,0)}
+}
+
+/* Header status shows "👂" when active — subtle green dot */
+.wake-btn.active svg{
+  animation:earBob .9s ease-in-out infinite alternate;
+}
+@keyframes earBob{
+  from{transform:scale(1)}
+  to  {transform:scale(1.15)}
+}
+
 /* WELCOME MSG */
 .welcome-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px 20px;color:var(--t2);text-align:center;flex:1}
 .welcome-msg .w-icon{font-size:48px;margin-bottom:4px}

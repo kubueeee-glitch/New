@@ -2,21 +2,38 @@
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const SYSTEM_PROMPT = `Jesteś asystentem AI o nazwie PhoneAI. Pomagasz użytkownikowi sterować telefonem przez komendy w języku polskim.
-Masz dostęp do funkcji sterowania telefonem. Używaj ich zawsze gdy polecenie użytkownika tego wymaga.
-Odpowiadaj WYŁĄCZNIE po polsku. Bądź zwięzły i konkretny — max 2 zdania po wykonaniu akcji.
-Jeśli polecenie jest niemożliwe, powiedz dlaczego i zaproponuj alternatywę.
-Możesz wykonać kilka akcji jednocześnie jeśli użytkownik tego chce.`;
+const SYSTEM_PROMPT = `Jesteś asystentem AI o imieniu Benedykt (aplikacja PhoneAI). Pomagasz użytkownikowi sterować telefonem przez komendy głosowe i tekstowe w języku polskim.
+Twoje imię to Benedykt — użytkownik aktywuje Cię mówiąc "Hej Benedykt".
+
+Masz dostęp do funkcji sterowania telefonem. Używaj ich zawsze gdy polecenie tego wymaga.
+Do porównywania cen produktów używaj comparePrice — możesz otworzyć kilka sklepów naraz (ceneo, google, allegro, xkom, morele, mediaexpert, euro, olx, amazon).
+Do otwierania przeglądarki / stron używaj openApp z appName="google" lub searchWeb.
+
+Odpowiadaj WYŁĄCZNIE po polsku. Bądź zwięzły — max 2 zdania po wykonaniu akcji.
+Jeśli coś jest niemożliwe, powiedz dlaczego i zaproponuj alternatywę.
+Możesz wykonać kilka akcji jednocześnie.`;
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 const S = {
-  apiKey: localStorage.getItem('phoneai_key') || '',
-  model:  localStorage.getItem('phoneai_model') || 'gemini-2.0-flash',
-  history: [],
-  busy: false,
-  wakeLock: null,
+  apiKey:      localStorage.getItem('phoneai_key')   || '',
+  model:       localStorage.getItem('phoneai_model') || 'gemini-2.0-flash',
+  history:     [],
+  busy:        false,
+  wakeLock:    null,
   torchStream: null,
+  listening:   false,
+  rec:         null,
 };
+
+// Wake-word state — separate from S to avoid confusion
+const W = { active: false, rec: null, awaitingCmd: false };
+
+// Accepted phonetic variations of "Hej Benedykt"
+const WAKE_ALIASES = [
+  'hej benedykt','hey benedykt','ej benedykt','hej benedict',
+  'hej benedickt','hej benedikt','hey benedict','hej benedyk',
+  'hej benedy','benedykt','benedict',
+];
 
 // ── FUNCTION DECLARATIONS ────────────────────────────────────────────────────
 const PHONE_FNS = [
@@ -169,6 +186,33 @@ const PHONE_FNS = [
       },
       required: ['query']
     }
+  },
+  {
+    name: 'comparePrice',
+    description: 'Porównuje ceny produktu w polskich sklepach internetowych. Otwiera strony z porównaniem cen. Użyj gdy użytkownik chce porównać ceny, kupić coś taniej lub sprawdzić oferty sklepów.',
+    parameters: {
+      type: 'object',
+      properties: {
+        product: { type: 'string', description: 'Nazwa produktu do porównania cen.' },
+        stores: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Sklepy: ceneo, google, allegro, olx, mediaexpert, euro, xkom, morele, amazon. Domyślnie ceneo + google.'
+        }
+      },
+      required: ['product']
+    }
+  },
+  {
+    name: 'openBrowser',
+    description: 'Otwiera przeglądarkę z podanym adresem URL lub wyszukiwaniem. Użyj gdy użytkownik chce otworzyć konkretny adres internetowy.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url:   { type: 'string', description: 'Adres URL do otwarcia (np. https://example.com).' },
+        query: { type: 'string', description: 'Wyszukiwanie gdy nie ma konkretnego URL.' }
+      }
+    }
   }
 ];
 
@@ -200,10 +244,13 @@ async function execFn(name, args = {}) {
       const t = text  ? encodeURIComponent(text)  : '';
       const e = email ? encodeURIComponent(email) : '';
       const map = {
-        youtube:      q ? `https://www.youtube.com/results?search_query=${q}` : 'https://www.youtube.com',
-        youtubemusic: 'https://music.youtube.com',
-        maps:         q ? `https://maps.google.com/?q=${q}` : 'https://maps.google.com',
-        googlemaps:   q ? `https://maps.google.com/?q=${q}` : 'https://maps.google.com',
+        youtube:       q ? `https://www.youtube.com/results?search_query=${q}` : 'https://www.youtube.com',
+        youtubemusic:  'https://music.youtube.com',
+        maps:          q ? `https://maps.google.com/?q=${q}` : 'https://maps.google.com',
+        googlemaps:    q ? `https://maps.google.com/?q=${q}` : 'https://maps.google.com',
+        przegladarka:  q ? `https://www.google.com/search?q=${q}` : 'https://www.google.com',
+        browser:       q ? `https://www.google.com/search?q=${q}` : 'https://www.google.com',
+        chrome:        q ? `https://www.google.com/search?q=${q}` : 'https://www.google.com',
         whatsapp:     p ? `https://wa.me/${p}${t ? '?text=' + t : ''}` : 'https://web.whatsapp.com',
         instagram:    'https://www.instagram.com',
         facebook:     'https://www.facebook.com',
@@ -373,6 +420,34 @@ async function execFn(name, args = {}) {
     searchWeb: ({ query }) => {
       window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
       return ok(`Wyszukano: ${query}`);
+    },
+
+    comparePrice: ({ product, stores = ['ceneo', 'google'] }) => {
+      const q = encodeURIComponent(product);
+      const URLS = {
+        ceneo:       `https://www.ceneo.pl/szukaj-${q}.htm`,
+        google:      `https://www.google.com/search?q=${q}&tbm=shop`,
+        allegro:     `https://allegro.pl/listing?string=${q}`,
+        olx:         `https://www.olx.pl/oferty/q-${q}/`,
+        mediaexpert: `https://www.mediaexpert.pl/search?hints=${q}`,
+        euro:        `https://www.euro.com.pl/search.bhtml?keyword=${q}`,
+        xkom:        `https://www.x-kom.pl/szukaj?phrase=${q}`,
+        morele:      `https://www.morele.net/szukaj/${q}/`,
+        amazon:      `https://www.amazon.pl/s?k=${q}`,
+      };
+      const list = [...new Set(stores.map(s => s.toLowerCase().replace(/[\s-]/g, '')))].slice(0, 4);
+      const opened = [];
+      for (const s of list) {
+        if (URLS[s]) { window.open(URLS[s], '_blank'); opened.push(s); }
+      }
+      if (!opened.length) return err('Nie znam podanych sklepów. Użyj: ceneo, google, allegro, xkom, morele, amazon.');
+      return ok(`Porównuję ceny "${product}" w: ${opened.join(', ')}`);
+    },
+
+    openBrowser: ({ url, query }) => {
+      const target = url || (query ? `https://www.google.com/search?q=${encodeURIComponent(query)}` : 'https://www.google.com');
+      window.open(target, '_blank');
+      return ok(`Otwarto przeglądarkę${url ? ': ' + url : query ? ' — ' + query : ''}`);
     }
   };
 
@@ -556,6 +631,134 @@ function toggleVoice() {
   rec.start();
 }
 
+// ── WAKE WORD "HEJ BENEDYKT" ──────────────────────────────────────────────────
+function toggleWakeWord() {
+  W.active ? stopWakeWord() : startWakeWord();
+}
+
+function startWakeWord() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    addMsg('ai', '❌ Nasłuchiwanie na hasło wymaga Chrome na Androidzie lub Chrome/Edge na komputerze.');
+    return;
+  }
+  W.active = true;
+  _updateWakeBtn(true);
+  setStatus('👂 Nasłuchuję…');
+  addMsg('ai', '👂 Nasłuchuję na hasło **"Hej Benedykt"**. Powiedz je, a zapytam co mam zrobić.');
+  _wakeLoop();
+}
+
+function stopWakeWord() {
+  W.active = false;
+  W.awaitingCmd = false;
+  W.rec?.stop();
+  W.rec = null;
+  _updateWakeBtn(false);
+  setStatus('Gotowy');
+}
+
+function _updateWakeBtn(on) {
+  const btn = document.getElementById('wakeBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', on);
+  btn.title = on ? 'Wyłącz "Hej Benedykt"' : 'Włącz "Hej Benedykt"';
+}
+
+function _wakeLoop() {
+  if (!W.active || W.awaitingCmd) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = 'pl-PL';
+  rec.continuous = false;   // false + auto-restart = most reliable on Android
+  rec.interimResults = true;
+
+  let triggered = false;
+
+  rec.onresult = e => {
+    if (triggered) return;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.toLowerCase().trim();
+      if (WAKE_ALIASES.some(alias => t.includes(alias))) {
+        triggered = true;
+        rec.stop();
+        _onWakeDetected();
+        return;
+      }
+    }
+  };
+
+  rec.onend = () => {
+    W.rec = null;
+    if (W.active && !triggered && !W.awaitingCmd) setTimeout(_wakeLoop, 150);
+  };
+
+  rec.onerror = e => {
+    W.rec = null;
+    if (e.error === 'not-allowed') {
+      stopWakeWord();
+      addMsg('ai', '❌ Brak uprawnień do mikrofonu. Zezwól w ustawieniach przeglądarki.');
+      return;
+    }
+    if (W.active && !W.awaitingCmd) setTimeout(_wakeLoop, e.error === 'no-speech' ? 100 : 700);
+  };
+
+  try { rec.start(); W.rec = rec; }
+  catch(e) { if (W.active) setTimeout(_wakeLoop, 500); }
+}
+
+function _onWakeDetected() {
+  W.awaitingCmd = true;
+  // Haptic + audio confirmation
+  navigator.vibrate?.([70, 40, 70]);
+  _beep(880, 0.18, 120);
+  setTimeout(() => _beep(1100, 0.14, 100), 140);
+
+  addMsg('ai', '✨ Słyszę Cię! Co mam zrobić?');
+  setStatus('Słucham polecenia…');
+
+  setTimeout(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = 'pl-PL';
+    rec.continuous = false;
+    rec.interimResults = false;
+
+    const vBtn = document.getElementById('voiceBtn');
+    vBtn.classList.add('listening');
+
+    const done = (cmd) => {
+      vBtn.classList.remove('listening');
+      W.awaitingCmd = false;
+      if (cmd) {
+        processMessage(cmd);
+      } else {
+        addMsg('ai', 'Nie dosłyszałem polecenia. Spróbuj ponownie lub wpisz tekst.');
+      }
+      if (W.active) { setStatus('👂 Nasłuchuję…'); setTimeout(_wakeLoop, 1200); }
+      else setStatus('Gotowy');
+    };
+
+    rec.onresult = e => done(e.results[0][0].transcript.trim());
+    rec.onend    = () => { if (W.awaitingCmd) done(''); };
+    rec.onerror  = () => { if (W.awaitingCmd) done(''); };
+
+    rec.start();
+  }, 450);
+}
+
+function _beep(freq, vol, dur) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur / 1000);
+    o.start(); o.stop(ctx.currentTime + dur / 1000);
+  } catch(e) {}
+}
+
 // ── SEND MESSAGE ──────────────────────────────────────────────────────────────
 function sendMessage() {
   const input = document.getElementById('messageInput');
@@ -624,6 +827,9 @@ function init() {
   // Voice
   document.getElementById('voiceBtn').addEventListener('click', toggleVoice);
 
+  // Wake word
+  document.getElementById('wakeBtn').addEventListener('click', toggleWakeWord);
+
   // Quick actions
   document.querySelectorAll('.qa-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -638,8 +844,8 @@ function addWelcome() {
   chat.innerHTML = `
     <div class="welcome-msg">
       <div class="w-icon">🤖</div>
-      <h3>Cześć! Jestem PhoneAI</h3>
-      <p>Steruj swoim telefonem przez AI. Napisz co mam zrobić lub użyj skrótów powyżej.</p>
+      <h3>Cześć! Jestem Benedykt</h3>
+      <p>Powiedz <strong>"Hej Benedykt"</strong> aby mnie aktywować głosowo, albo napisz polecenie. Mogę sterować telefonem, porównywać ceny w sklepach i wiele więcej.</p>
     </div>`;
 }
 
