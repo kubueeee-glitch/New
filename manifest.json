@@ -1,0 +1,21 @@
+{
+  "name": "PhoneAI - Sterowanie Telefonem",
+  "short_name": "PhoneAI",
+  "description": "Steruj swoim telefonem głosem i tekstem przez Gemini AI",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07070f",
+  "theme_color": "#07070f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "pl"
+}
