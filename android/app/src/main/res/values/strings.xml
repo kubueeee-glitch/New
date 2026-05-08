@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Shop</string>
+    <string name="accessibility_label">AI Shop — sterowanie telefonem</string>
+    <string name="accessibility_description">Pozwala asystentowi AI otwierać aplikacje, klikać i wpisywać tekst w Twoim imieniu.</string>
+</resources>

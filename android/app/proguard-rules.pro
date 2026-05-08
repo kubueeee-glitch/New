@@ -1,0 +1,5 @@
+-keepattributes *Annotation*, InnerClasses
+-dontwarn kotlinx.serialization.**
+-keep,includedescriptorclasses class com.aishop.assistant.**$$serializer { *; }
+-keepclassmembers class com.aishop.assistant.** { *** Companion; }
+-keepclasseswithmembers class com.aishop.assistant.** { kotlinx.serialization.KSerializer serializer(...); }
