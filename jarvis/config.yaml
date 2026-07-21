@@ -1,0 +1,29 @@
+# Konfiguracja Jarvisa — sekcje istotne dla E8 (wzrok).
+
+vision:
+  # Skalowanie dłuższego boku przed wysłaniem do VLM (natywne 1440p to ogrom
+  # tokenów obrazu i kilkukrotnie dłuższy prefill).
+  max_long_side: 1024
+  ollama_url: "http://127.0.0.1:11434"
+  # Model tekstowy z routera LLM (E1–E7) — zwalniany przed S2 i przywracany po.
+  text_model: "qwen2.5:7b-instruct-q4_K_M"
+  # Katalog na zrzuty zapisywane po jawnym „zapisz to".
+  save_dir: "~/Obrazy/jarvis"
+  s2:
+    # Pull na żądanie, nie na starcie — encoder wizji zjada ~1,4 GB VRAM
+    # samą obecnością, na 8 GB to niedopuszczalne.
+    default_model: "qwen2.5vl:7b"      # domyślny: dobry OCR i rozumienie zrzutów
+    fast_model: "moondream2"           # 1,9 B / ~2 GB — proste pytania
+    code_ui_model: ""                  # np. InternVL 2.5 8B — zrzuty kodu i UI
+
+privacy:
+  # Gdy aktywne okno pasuje do wzorca → odmowa zrzutu i komunikat głosowy.
+  # Wzorce z * / ? działają jak fnmatch, zwykłe — jak dopasowanie fragmentu.
+  excluded_windows:
+    - "KeePass"
+    - "1Password"
+    - "Bitwarden"
+    - "*bank*"
+    - "PKO"
+    - "Santander"
+    - "Revolut"
