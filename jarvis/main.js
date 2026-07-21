@@ -11,6 +11,17 @@ const fs = require('fs');
 
 const isDev = process.argv.includes('--dev');
 
+// ---------- Widoczne błędy startu ----------
+// Zamiast cichego „nie uruchamia się" — pokaż okno z błędem i zapisz do pliku.
+function reportFatal(where, err) {
+  const msg = (err && err.stack) ? err.stack : String(err);
+  try { fs.writeFileSync(path.join(app.getPath('userData'), 'crash.log'), where + '\n' + msg); } catch {}
+  try { dialog.showErrorBox('Jarvis — błąd (' + where + ')', msg.slice(0, 3000)); } catch {}
+  console.error(where, err);
+}
+process.on('uncaughtException', (e) => reportFatal('uncaughtException', e));
+process.on('unhandledRejection', (e) => reportFatal('unhandledRejection', e));
+
 // ---------- Trwałość danych (userData) ----------
 let DATA_DIR;
 function dataPath(...p) { return path.join(DATA_DIR, ...p); }
@@ -95,9 +106,13 @@ function createWindow() {
       backgroundThrottling: false
     }
   });
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html')).catch(e => reportFatal('loadFile', e));
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => { win = null; });
+  win.webContents.on('did-fail-load', (_e, code, desc) => reportFatal('did-fail-load', desc + ' (' + code + ')'));
+  win.webContents.on('render-process-gone', (_e, d) => reportFatal('render-process-gone', d && d.reason));
+  // pokaż okno nawet gdyby ready-to-show nie zdążyło
+  setTimeout(() => { try { if (win && !win.isVisible()) win.show(); } catch {} }, 1500);
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
 }
 
