@@ -39,7 +39,7 @@ async function init() {
   renderSkillsPanel();
   renderMetrics();
   updateCounter();
-  $('wname').textContent = settings.userName || 'Sir';
+  const wn0 = $('wname'); if (wn0) wn0.textContent = settings.userName || 'Sir';
   updateApiLed();
   setInterval(renderMetrics, 4000);
 }
@@ -363,7 +363,8 @@ async function saveSettings() {
     document.querySelectorAll('#settings-body [data-model]').forEach(el => s.models[el.dataset.model] = el.value);
     document.querySelectorAll('#settings-body .tog').forEach(t => s[t.dataset.tog] = t.classList.contains('on'));
     settings = await J.setSettings(s);
-    applyTheme(); updateApiLed(); $('wname').textContent = settings.userName;
+    applyTheme(); updateApiLed();
+    const wn = $('wname'); if (wn) wn.textContent = settings.userName;
     Voice.applySettings(); renderDocuments();
     toast('✅ Zapisano.'); closePanels();
   } catch (e) {
