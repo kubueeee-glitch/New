@@ -16,7 +16,7 @@ let DATA_DIR;
 function dataPath(...p) { return path.join(DATA_DIR, ...p); }
 function ensureDirs() {
   DATA_DIR = app.getPath('userData');
-  for (const d of ['', 'knowledge', 'quarantine']) {
+  for (const d of ['', 'knowledge', 'quarantine', 'skills']) {
     const full = dataPath(d);
     if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
   }
@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS = {
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'qwen2.5:7b',
   virusTotalKey: '',
+  vaultPath: '',                   // folder Obsidian vault dla bazy wiedzy (puste = lokalnie)
+  localVoiceUrl: '',               // opcjonalny lokalny serwer STT/TTS (faster-whisper/Kokoro)
   models: {
     orchestrator: 'claude-opus-4-8',
     Operator: 'claude-opus-4-8',
@@ -50,7 +52,7 @@ const DEFAULT_SETTINGS = {
   continuousListen: false,
   autoStart: false,
   watchDownloads: false,
-  theme: 'cyan',
+  theme: 'green',
   maxParallelAgents: 4
 };
 
@@ -177,18 +179,20 @@ const automation = require('./tools/automation');
 const security = require('./tools/security');
 const knowledge = require('./tools/knowledge');
 const websearch = require('./tools/websearch');
+const skills = require('./tools/skills');
 const { Orchestrator } = require('./agents/orchestrator');
 
 // zbiór wszystkich handlerów narzędzi
 const allHandlers = Object.assign({},
-  system.handlers, automation.handlers, security.handlers, knowledge.handlers, websearch.handlers
+  system.handlers, automation.handlers, security.handlers, knowledge.handlers, websearch.handlers, skills.handlers
 );
 const toolSchemas = {
   system: system.schemas,
   automation: automation.schemas,
   security: security.schemas,
   knowledge: knowledge.schemas,
-  web: websearch.schemas
+  web: websearch.schemas,
+  skills: skills.schemas
 };
 
 let orchestrator = null;
@@ -232,6 +236,7 @@ ipcMain.handle('knowledge:get', (_e, name) => knowledge.readTopicFile(store, nam
 ipcMain.handle('knowledge:delete', (_e, name) => knowledge.deleteTopicFile(store, name));
 ipcMain.handle('security:recent', () => security.recentScans(store));
 ipcMain.handle('security:quarantine-list', () => security.quarantineList(store));
+ipcMain.handle('skills:list', () => skills.listSkills(toolCtx));
 
 // ---------- IPC: okno ----------
 ipcMain.on('win:minimize', () => win && win.minimize());

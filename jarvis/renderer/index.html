@@ -4,67 +4,80 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'">
-<title>Jarvis</title>
+<title>V.A.U.L.T</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
-<body class="theme-cyan">
+<body class="theme-green">
 
-  <!-- TITLEBAR -->
-  <div class="titlebar">
-    <div class="tb-brand"><span class="tb-dot"></span>JARVIS</div>
-    <div class="tb-actions">
-      <button class="tb-btn" id="btn-top" title="Zawsze na wierzchu">▢</button>
-      <button class="tb-btn" id="btn-min" title="Minimalizuj">—</button>
-      <button class="tb-btn close" id="btn-close" title="Ukryj do zasobnika">✕</button>
+  <!-- TITLEBAR / STATUS BAR -->
+  <div class="statusbar">
+    <div class="sb-left">
+      <span class="sb-brand">V.A.U.L.T</span>
+      <span class="sb-sub" id="sb-engine">SYSTEM ONLINE</span>
     </div>
-  </div>
-
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div class="tb-stat"><span class="tb-led" id="led-api"></span><span id="api-label">API: offline</span></div>
-    <div class="tb-stat"><span class="tb-led" id="led-mic"></span><span>Mikrofon</span></div>
-    <div class="tb-stat">Agenci: <b id="agents-active">0</b></div>
-    <div class="tb-stat" id="stat-sys">CPU/RAM: —</div>
-    <div class="tb-spacer"></div>
-    <div class="tb-stat" id="clock">--:--</div>
-    <div class="tb-nav">
-      <button data-panel="knowledge">Wiedza</button>
-      <button data-panel="security">Bezpieczeństwo</button>
-      <button data-panel="log">Log</button>
-      <button data-panel="settings">⚙ Ustawienia</button>
+    <div class="sb-tokens" id="sb-tokens">
+      <span class="tok"><i class="dot on" id="led-api"></i><span id="api-label">CORE</span></span>
+      <span class="tok" id="tok-state">IDLE</span>
+      <span class="tok"><i class="dot" id="led-mic"></i>MIC</span>
+      <span class="tok">RUNNER · <b id="agents-active">0</b></span>
+      <span class="tok on">ALIVE</span>
     </div>
-  </div>
-
-  <!-- MAIN -->
-  <div class="main">
-    <!-- SWARM -->
-    <div class="swarm">
-      <div class="swarm-h"><span>Rój agentów</span><span class="swarm-count" id="swarm-count">idle</span></div>
-      <div id="swarm-list"></div>
-    </div>
-
-    <!-- CENTER -->
-    <div class="center">
-      <div class="reactor-wrap">
-        <div class="reactor" id="reactor" data-state="idle">
-          <div class="r r-outer"></div><div class="r r-mid"></div><div class="r r-inner"></div>
-          <div class="r-pulse"></div><div class="r-core"></div>
-        </div>
-        <div class="reactor-info">
-          <div class="reactor-state" id="reactor-state">GOTOWY</div>
-          <div class="reactor-sub" id="reactor-sub">Powiedz „Hej Jarvis” albo napisz polecenie.</div>
-          <div class="voice-viz" id="voice-viz"></div>
-          <div class="auto-warn" id="auto-warn">⚠ AUTOMATYZACJA AKTYWNA — zatrzymaj: Ctrl+Shift+X</div>
-        </div>
+    <div class="sb-right">
+      <span class="sb-clock" id="clock">--:--:--</span>
+      <div class="sb-nav">
+        <button data-panel="knowledge" title="Wiedza">🧠</button>
+        <button data-panel="security" title="Bezpieczeństwo">🛡</button>
+        <button data-panel="log" title="Log">📜</button>
+        <button data-panel="settings" title="Ustawienia">⚙</button>
       </div>
+      <div class="sb-win">
+        <button class="tb-btn" id="btn-top" title="Na wierzchu">▢</button>
+        <button class="tb-btn" id="btn-min" title="Minimalizuj">—</button>
+        <button class="tb-btn close" id="btn-close" title="Ukryj">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="vault">
+
+    <!-- LEFT: METRICS + DOCUMENTS -->
+    <aside class="col col-left">
+      <div class="block">
+        <div class="block-h">METRICS</div>
+        <div id="metrics"></div>
+      </div>
+      <div class="block grow">
+        <div class="block-h">DOCUMENTS</div>
+        <div id="documents" class="scroll"></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: SPHERE + CHAT -->
+    <section class="col col-center">
+      <div class="sphere-wrap" id="reactor" data-state="idle">
+        <canvas id="sphere"></canvas>
+        <div class="sphere-status">
+          <div class="sphere-state" id="reactor-state">GOTOWY</div>
+          <div class="sphere-sub" id="reactor-sub">Powiedz „Hej Jarvis” albo napisz polecenie.</div>
+        </div>
+        <div class="voice-viz" id="voice-viz"></div>
+      </div>
+
+      <div class="big-counter">
+        <b id="big-counter">0</b>
+        <span>TOKENY PRZETWORZONE</span>
+      </div>
+
+      <div class="auto-warn" id="auto-warn">⚠ AUTOMATYZACJA AKTYWNA — STOP: Ctrl+Shift+X</div>
 
       <div class="chat" id="chat">
         <div class="welcome" id="welcome">
-          <h2>Do usług, <span id="wname">Sir</span>.</h2>
-          <p>Jestem Jarvis — zarządzam zespołem agentów, którzy mogą działać równolegle: research w sieci, sterowanie komputerem, skanowanie bezpieczeństwa i porządkowanie wiedzy. Zacznij od dodania klucza API w Ustawieniach.</p>
+          <h2>V.A.U.L.T online. Do usług, <span id="wname">Sir</span>.</h2>
+          <p>Zespół agentów, pamięć-graf, skille i głos w jednym centrum dowodzenia. Zacznij od wyboru silnika AI w ⚙ Ustawieniach.</p>
           <div class="chips" id="chips"></div>
         </div>
       </div>
@@ -74,33 +87,33 @@
           <button class="mic" id="mic" title="Mów">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
           </button>
-          <textarea class="input" id="input" rows="1" placeholder="Napisz do Jarvisa… (Enter wysyła, Shift+Enter nowa linia)"></textarea>
+          <textarea class="input" id="input" rows="1" placeholder="Wpisz polecenie do V.A.U.L.T…"></textarea>
           <button class="send" id="send" title="Wyślij">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
       </div>
-    </div>
+    </section>
+
+    <!-- RIGHT: SKILLS + AGENTS -->
+    <aside class="col col-right">
+      <div class="block">
+        <div class="block-h">SKILLS</div>
+        <div id="skills-list" class="scroll"></div>
+      </div>
+      <div class="block grow">
+        <div class="block-h">AGENCI <span class="swarm-count" id="swarm-count">idle</span></div>
+        <div id="swarm-list" class="scroll"></div>
+      </div>
+    </aside>
   </div>
 
   <!-- PANELS -->
   <div class="overlay" id="overlay"></div>
-  <div class="panel" id="panel-settings">
-    <div class="panel-h"><h3>⚙ Ustawienia</h3><button class="tb-btn" data-close>✕</button></div>
-    <div class="panel-body" id="settings-body"></div>
-  </div>
-  <div class="panel" id="panel-knowledge">
-    <div class="panel-h"><h3>🧠 Baza wiedzy</h3><button class="tb-btn" data-close>✕</button></div>
-    <div class="panel-body" id="knowledge-body"></div>
-  </div>
-  <div class="panel" id="panel-security">
-    <div class="panel-h"><h3>🛡 Bezpieczeństwo</h3><button class="tb-btn" data-close>✕</button></div>
-    <div class="panel-body" id="security-body"></div>
-  </div>
-  <div class="panel" id="panel-log">
-    <div class="panel-h"><h3>📜 Log akcji</h3><button class="tb-btn" data-close>✕</button></div>
-    <div class="panel-body" id="log-body"></div>
-  </div>
+  <div class="panel" id="panel-settings"><div class="panel-h"><h3>⚙ Ustawienia</h3><button class="tb-btn" data-close>✕</button></div><div class="panel-body" id="settings-body"></div></div>
+  <div class="panel" id="panel-knowledge"><div class="panel-h"><h3>🧠 Baza wiedzy</h3><button class="tb-btn" data-close>✕</button></div><div class="panel-body" id="knowledge-body"></div></div>
+  <div class="panel" id="panel-security"><div class="panel-h"><h3>🛡 Bezpieczeństwo</h3><button class="tb-btn" data-close>✕</button></div><div class="panel-body" id="security-body"></div></div>
+  <div class="panel" id="panel-log"><div class="panel-h"><h3>📜 Log akcji</h3><button class="tb-btn" data-close>✕</button></div><div class="panel-body" id="log-body"></div></div>
 
   <!-- CONFIRM MODAL -->
   <div class="modal-ovl" id="modal-ovl">

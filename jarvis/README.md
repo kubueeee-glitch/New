@@ -13,6 +13,18 @@ futurystycznym interfejsie HUD.
 
 ## Co potrafi
 
+- **🖥️ HUD „V.A.U.L.T. command center"** — jedno centrum dowodzenia: animowana
+  **kula z cząsteczek** jako wizualizacja głosu, panel **METRICS**, lista
+  **SKILLS**, **DOCUMENTS** (baza wiedzy), rój agentów, zegar, pasek statusu,
+  licznik przetworzonych tokenów. Terminalowa, monochromatyczna estetyka
+  (przełączalne motywy).
+- **🧩 Skille (architektura „mózgu")** — foldery z plikiem `SKILL.md`; Jarvis
+  widzi tylko krótki indeks, a pełną instrukcję wczytuje **na żądanie**
+  (`load_skill`) — „ładuje tylko to, czego akurat potrzebuje". Dołączone
+  przykłady: raport z researchu, kontrola bezpieczeństwa, plan dnia.
+- **🗂️ Pamięć jako Obsidian vault** — notatki i raporty zapisują się jako
+  markdown z **`[[wikilinkami]]`** tworzącymi graf, plus plik-indeks. Wskaż
+  ścieżkę swojego vaulta w Ustawieniach, a wiedza ląduje prosto w Obsidianie.
 - **🧠 Wielu agentów naraz** — orkiestrator *Jarvis* rozkłada polecenie na
   podzadania i deleguje je do wyspecjalizowanych agentów, którzy pracują
   **równolegle**:
@@ -128,6 +140,33 @@ wiadomości na wybrany silnik (Claude API albo lokalna Ollama), więc ten sam
 kod agentów działa z oboma.
 
 ---
+
+## Skille — jak dodać własny
+
+Utwórz folder w `jarvis/skills/` (dostarczane z aplikacją) albo w
+`<userData>/skills/` (Twoje prywatne) i wrzuć do niego plik `SKILL.md`:
+
+```markdown
+---
+name: Nazwa skilla
+description: Kiedy go użyć (widoczne w indeksie, po tym Jarvis wybiera skill).
+---
+# Nazwa skilla
+Instrukcje krok po kroku, których Jarvis ma się trzymać przy tym zadaniu.
+```
+
+Jarvis sam wykryje nowy skill i wczyta jego treść, gdy zadanie do niego pasuje.
+
+## THE VOICE — w pełni lokalny głos (opcjonalnie)
+
+Domyślnie głos działa przez przeglądarkę (synteza mowy + Web Speech). Jeśli
+chcesz **100% lokalny** tor jak w oryginale (uszy i usta bez chmury), postaw
+u siebie serwer z `faster-whisper` (STT) i `Kokoro` (TTS) — na 3060 Ti pójdą
+świetnie — i wpisz jego adres w **Ustawienia → Lokalny serwer głosu**.
+To jest udokumentowany punkt integracji: sama aplikacja nie instaluje tych
+Pythonowych narzędzi (są poza tym jednym repo z GUI), ale pole i ścieżka są
+przygotowane. Pełne, gotowe podpięcie mogę dorobić, gdy zdecydujesz się na
+konkretny lokalny serwer głosu.
 
 ## Ograniczenia (przeczytaj)
 

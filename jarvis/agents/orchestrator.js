@@ -8,6 +8,7 @@
 const { runAgent } = require('./runner');
 const { buildRegistry } = require('./registry');
 const knowledge = require('../tools/knowledge');
+const skills = require('../tools/skills');
 
 const DISPATCH_SCHEMAS = [
   {
@@ -49,6 +50,7 @@ class Orchestrator {
     const now = new Date().toLocaleString('pl-PL');
     const memBlock = mem.length ? mem.map(m => `- ${m.text}`).join('\n') : '(pusta)';
     const knowBlock = topics.length ? topics.map(t => `- ${t.name}: ${t.summary || ''}`).join('\n') : '(brak zapisanych tematów)';
+    const skillBlock = skills.skillsIndex(this.ctx);
     return `Nazywasz się Jarvis — osobisty asystent AI ${s.userName}. Mówisz po polsku, zwracasz się „${s.userName}".
 Osobowość: rzeczowy, lojalny, spokojny, z nutą suchego brytyjskiego humoru. Konkretny, bez lania wody. Emoji oszczędnie.
 
@@ -58,6 +60,9 @@ Jesteś ORKIESTRATOREM zespołu agentów. Masz dwie drogi:
 
 Agenci: Researcher (internet + wiedza), Operator (sterowanie komputerem), Guard (bezpieczeństwo/skan), Archivist (notatki/pamięć/pliki/makra).
 Po zebraniu wyników zsyntetyzuj krótki, naturalny meldunek dla użytkownika.
+
+Masz też SKILLE — gotowe instrukcje do typowych zadań. Gdy zadanie pasuje do skilla, wczytaj jego pełną treść narzędziem load_skill i postępuj według niej. Dostępne skille:
+${skillBlock}
 
 Zasady: akcje nieodwracalne (usuwanie, wyłączenie komputera, polecenia powłoki) wymagają potwierdzenia — narzędzia same o nie proszą, nie obchodź tego. Bądź uczciwy o ograniczeniach.
 
@@ -72,7 +77,7 @@ ${knowBlock}`;
   jarvisTools() {
     const kn = this.toolSchemas.knowledge;
     const instant = kn.filter(t => ['get_datetime', 'calculate', 'remember', 'forget', 'add_note', 'list_notes'].includes(t.name));
-    return [...DISPATCH_SCHEMAS, ...instant];
+    return [...DISPATCH_SCHEMAS, ...instant, ...(this.toolSchemas.skills || [])];
   }
 
   makeHandlers() {
@@ -118,7 +123,7 @@ ${knowBlock}`;
 
     // narzędzia natychmiastowe Jarvisa (bez delegacji)
     const instant = {};
-    for (const nm of ['get_datetime', 'calculate', 'remember', 'forget', 'add_note', 'list_notes']) {
+    for (const nm of ['get_datetime', 'calculate', 'remember', 'forget', 'add_note', 'list_notes', 'load_skill']) {
       if (allHandlers[nm]) instant[nm] = allHandlers[nm];
     }
     return Object.assign({ dispatch_agent: dispatch, collect_results: collect }, instant);

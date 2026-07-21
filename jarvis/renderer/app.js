@@ -8,6 +8,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&a
 let settings = null;
 let history = [];           // {role:'user'|'ai', content}
 let busy = false;
+const metrics = { msgs: 0, tokens: 0, agentRuns: 0, start: Date.now() };
 const AGENTS = [
   { id: 'Jarvis', icon: '🧠' }, { id: 'Researcher', icon: '🔎' },
   { id: 'Operator', icon: '🖱️' }, { id: 'Guard', icon: '🛡️' }, { id: 'Archivist', icon: '🗂️' }
@@ -29,13 +30,17 @@ async function init() {
   subscribe();
   startClock();
   Voice.init();
+  Sphere.init();
+  renderDocuments();
+  renderSkillsPanel();
+  renderMetrics();
+  updateCounter();
   $('wname').textContent = settings.userName || 'Sir';
   updateApiLed();
-  pollSysStats();
-  setInterval(pollSysStats, 8000);
+  setInterval(renderMetrics, 4000);
 }
 
-function applyTheme() { document.body.className = 'theme-' + (settings.theme || 'cyan'); }
+function applyTheme() { document.body.className = 'theme-' + (settings.theme || 'green'); }
 function updateApiLed() {
   if (settings.provider === 'ollama') {
     $('led-api').classList.add('on');
@@ -89,7 +94,9 @@ function setReactor(state, sub) {
   $('reactor').dataset.state = state;
   const labels = { idle: 'GOTOWY', thinking: 'MYŚLĘ', acting: 'DZIAŁAM', listening: 'SŁUCHAM', speaking: 'MÓWIĘ' };
   $('reactor-state').textContent = labels[state] || state.toUpperCase();
+  const tok = $('tok-state'); if (tok) tok.textContent = (labels[state] || state).toUpperCase();
   if (sub != null) $('reactor-sub').textContent = sub;
+  Sphere.setState(state);
 }
 function reflectReactor() {
   if (Voice.speaking) return setReactor('speaking');
@@ -98,6 +105,92 @@ function reflectReactor() {
   if (busy) return setReactor('thinking', 'Przetwarzam…');
   setReactor('idle', 'Powiedz „Hej Jarvis” albo napisz polecenie.');
 }
+
+// ================= METRICS / DOCS / SKILLS =================
+function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'K' : String(n); }
+function renderMetrics() {
+  const upMin = Math.floor((Date.now() - metrics.start) / 60000);
+  const rows = [
+    { l: 'Rozmowy', v: fmt(metrics.msgs), p: Math.min(100, metrics.msgs * 4) },
+    { l: 'Tokeny ~', v: fmt(metrics.tokens), p: Math.min(100, metrics.tokens / 200) },
+    { l: 'Zadania agentów', v: fmt(metrics.agentRuns), p: Math.min(100, metrics.agentRuns * 8) },
+    { l: 'Uptime (min)', v: fmt(upMin), p: Math.min(100, upMin) }
+  ];
+  const el = $('metrics'); if (!el) return;
+  el.innerHTML = rows.map(r => `<div class="metric"><div class="metric-top"><span class="metric-l">${r.l}</span><span class="metric-v">${r.v}</span></div><div class="metric-bar"><i style="width:${r.p}%"></i></div></div>`).join('');
+}
+function updateCounter() { const el = $('big-counter'); if (el) el.textContent = metrics.tokens.toLocaleString('pl-PL'); }
+async function renderDocuments() {
+  const el = $('documents'); if (!el) return;
+  const topics = await J.listKnowledge();
+  el.innerHTML = topics.length
+    ? topics.map(t => `<div class="doc" data-doc="${esc(t.name)}"><div class="doc-n">◆ ${esc(t.name)}</div><div class="doc-s">${esc(t.summary || '')}</div></div>`).join('')
+    : '<div class="empty-note">Brak dokumentów. Zleć research — raporty wylądują tu jako notatki-graf.</div>';
+  el.querySelectorAll('[data-doc]').forEach(b => b.onclick = async () => { const r = await J.getKnowledge(b.dataset.doc); if (r.ok) { openPanel('knowledge'); showDoc(b.dataset.doc, r.content); } });
+}
+async function renderSkillsPanel() {
+  const el = $('skills-list'); if (!el) return;
+  const skills = await J.listSkills();
+  el.innerHTML = skills.length
+    ? skills.map(s => `<div class="skill"><div class="skill-n">▸ ${esc(s.name)}</div><div class="skill-s">${esc(s.description || '')}</div></div>`).join('')
+    : '<div class="empty-note">Brak skilli. Dodaj folder ze SKILL.md w katalogu skills/.</div>';
+}
+
+// ================= SPHERE (voice viz) =================
+const Sphere = {
+  cv: null, ctx: null, pts: [], state: 'idle', raf: null, rot: 0, W: 0, H: 0, dpr: 1,
+  init() {
+    this.cv = $('sphere'); if (!this.cv) return;
+    this.ctx = this.cv.getContext('2d');
+    this.resize(); window.addEventListener('resize', () => this.resize());
+    const N = 520;
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i / (N - 1)) * 2;
+      const r = Math.sqrt(1 - y * y);
+      const th = i * 2.399963;
+      this.pts.push({ x: Math.cos(th) * r, y, z: Math.sin(th) * r });
+    }
+    this.loop();
+  },
+  resize() {
+    if (!this.cv) return;
+    this.dpr = window.devicePixelRatio || 1;
+    this.W = this.cv.clientWidth; this.H = this.cv.clientHeight;
+    this.cv.width = this.W * this.dpr; this.cv.height = this.H * this.dpr;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+  },
+  setState(s) { this.state = s; },
+  loop() {
+    const c = this.ctx; if (!c) return;
+    const cx = this.W / 2, cy = this.H / 2;
+    const base = Math.min(this.W, this.H) * 0.32;
+    const energy = (this.state === 'listening' || this.state === 'speaking') ? (0.5 + Voice.energy * 0.9)
+      : this.state === 'thinking' ? 0.55 : this.state === 'acting' ? 0.6 : 0.32;
+    const spd = this.state === 'thinking' ? 0.028 : this.state === 'acting' ? 0.02 : this.state === 'idle' ? 0.006 : 0.014;
+    this.rot += spd;
+    const col = getComputedStyle(document.body).getPropertyValue('--ac').trim() || '#39ff9e';
+    c.clearRect(0, 0, this.W, this.H);
+    const rad = base * (0.85 + energy * 0.5);
+    const cosR = Math.cos(this.rot), sinR = Math.sin(this.rot);
+    const tilt = 0.42;
+    for (const p of this.pts) {
+      const x1 = p.x * cosR - p.z * sinR;
+      const z1 = p.x * sinR + p.z * cosR;
+      const y1 = p.y * Math.cos(tilt) - z1 * Math.sin(tilt);
+      const z2 = p.y * Math.sin(tilt) + z1 * Math.cos(tilt);
+      const persp = 1 / (2 - z2);
+      const sx = cx + x1 * rad * persp * 1.4;
+      const sy = cy + y1 * rad * persp * 1.4;
+      const depth = (z2 + 1) / 2;
+      const size = 0.6 + depth * 1.9;
+      c.globalAlpha = 0.15 + depth * 0.85;
+      c.fillStyle = col;
+      c.beginPath(); c.arc(sx, sy, size, 0, 6.2832); c.fill();
+    }
+    c.globalAlpha = 1;
+    this.raf = requestAnimationFrame(() => this.loop());
+  }
+};
 
 // ================= CHAT =================
 function renderChips() { $('chips').innerHTML = CHIPS.map(c => `<button class="chip">${esc(c)}</button>`).join(''); document.querySelectorAll('#chips .chip').forEach(b => b.onclick = () => { $('input').value = b.textContent; send(); }); }
@@ -122,6 +215,7 @@ async function send() {
   if (settings.provider !== 'ollama' && (!settings.apiKey || settings.apiKey.trim().length < 10)) { toast('🔑 Dodaj klucz API lub przełącz na Ollamę (za darmo) w Ustawieniach.'); openPanel('settings'); return; }
   ta.value = ''; ta.style.height = 'auto';
   addMsg('user', text); history.push({ role: 'user', content: text });
+  metrics.msgs++; metrics.tokens += Math.ceil(text.length / 4);
   busy = true; reflectReactor(); showTyping();
   updateAgent({ name: 'Jarvis', status: 'thinking', task: 'analizuję polecenie' });
   try {
@@ -131,9 +225,13 @@ async function send() {
     else {
       addMsg('ai', res.reply, res.actions);
       history.push({ role: 'ai', content: res.reply });
+      metrics.tokens += Math.ceil((res.reply || '').length / 4);
+      metrics.agentRuns += (res.actions || []).length;
       if (settings.voiceEnabled) Voice.speak(res.reply);
+      renderDocuments();
     }
   } catch (e) { hideTyping(); addMsg('ai', '⚠️ ' + (e.message || e)); }
+  updateCounter(); renderMetrics();
   busy = false;
   AGENTS.forEach(a => { const l = $('led-' + a.id); if (l && !Voice.speaking) { l.className = 'agent-led'; } });
   updateAgent({ name: 'Jarvis', status: 'idle' });
@@ -151,7 +249,8 @@ function subscribe() {
     else if (p.type === 'scan') toast((p.entry.verdict === 'clean' ? '✔ ' : '⚠️ ') + 'Skan: ' + (p.entry.verdict));
     else if (p.type === 'security') toast('🛡️ ' + p.message);
     else if (p.type === 'memory') toast('🧠 Zapamiętano.');
-    else if (p.type === 'knowledge') toast('📚 Wiedza zaktualizowana: ' + p.name);
+    else if (p.type === 'skill') toast('⚡ Skill: ' + p.name);
+    else if (p.type === 'knowledge') { toast('📚 Wiedza: ' + p.name); renderDocuments(); }
     else if (p.type === 'quarantine') toast('🧷 Kwarantanna: ' + p.from);
   });
 }
@@ -212,7 +311,9 @@ function renderSettings() {
       <div class="field"><label>Guard</label>${modelSel('Guard')}</div>
       <div class="field"><label>Archivist</label>${modelSel('Archivist')}</div>
     </div>
-    <div class="field"><label>Motyw</label><select id="set-theme">${['cyan', 'amber', 'green', 'violet'].map(t => `<option ${s.theme === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label>Folder Obsidian vault (pamięć)</label><input id="set-vault" value="${esc(s.vaultPath || '')}" placeholder="np. C:\\Users\\Ty\\ObsidianVault"><div class="hint">Puste = pamięć lokalna w aplikacji. Podaj ścieżkę, by notatki-graf zapisywały się w Twoim vaultcie Obsidian (z <b>[[wikilinkami]]</b>).</div></div>
+    <div class="field"><label>Lokalny serwer głosu (opcjonalnie)</label><input id="set-localVoice" value="${esc(s.localVoiceUrl || '')}" placeholder="http://localhost:8000"><div class="hint">Adres lokalnego STT/TTS (faster-whisper + Kokoro), jeśli go postawisz. Puste = głos z przeglądarki.</div></div>
+    <div class="field"><label>Motyw</label><select id="set-theme">${['green', 'cyan', 'amber', 'violet'].map(t => `<option ${s.theme === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label>Głos Jarvisa (synteza mowy)</label><select id="set-voice"></select></div>
     ${tog('voiceEnabled', '🔊 Mowa włączona')}
     ${tog('wakeWord', '🎙️ Wake word „Hej Jarvis”')}
@@ -248,6 +349,8 @@ async function saveSettings() {
   s.ollamaUrl = $('set-ollamaUrl').value.trim() || 'http://localhost:11434';
   s.ollamaModel = $('set-ollamaModel').value.trim() || 'qwen2.5:7b';
   s.virusTotalKey = $('set-vtKey').value.trim();
+  s.vaultPath = $('set-vault').value.trim();
+  s.localVoiceUrl = $('set-localVoice').value.trim();
   s.theme = $('set-theme').value;
   s.voiceName = $('set-voice').value;
   s.models = Object.assign({}, s.models);
@@ -255,7 +358,7 @@ async function saveSettings() {
   document.querySelectorAll('#settings-body .tog').forEach(t => s[t.dataset.tog] = t.classList.contains('on'));
   settings = await J.setSettings(s);
   applyTheme(); updateApiLed(); $('wname').textContent = settings.userName;
-  Voice.applySettings();
+  Voice.applySettings(); renderDocuments();
   toast('✅ Zapisano.'); closePanels();
 }
 async function loadMemory() {
@@ -318,9 +421,8 @@ function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.
 
 // ================= VOICE =================
 const Voice = {
-  speaking: false, listening: false, rec: null, vizBars: [], vizRAF: null, audioCtx: null, analyser: null, micStream: null, recActive: false,
+  speaking: false, listening: false, energy: 0, rec: null, vizBars: [], vizRAF: null, audioCtx: null, analyser: null, micStream: null, recActive: false,
   init() {
-    const viz = $('voice-viz'); for (let i = 0; i < 22; i++) { const b = document.createElement('i'); viz.appendChild(b); this.vizBars.push(b); }
     this.populateVoicesLater();
     if (settings.wakeWord || settings.continuousListen) this.startContinuous();
   },
@@ -396,12 +498,12 @@ const Voice = {
       const src = this.audioCtx.createMediaStreamSource(this.micStream);
       this.analyser = this.audioCtx.createAnalyser(); this.analyser.fftSize = 64; src.connect(this.analyser);
       const data = new Uint8Array(this.analyser.frequencyBinCount);
-      const loop = () => { if (!this.listening) return; this.analyser.getByteFrequencyData(data); this.vizBars.forEach((b, i) => b.style.height = 4 + (data[i % data.length] / 255) * 30 + 'px'); this.vizRAF = requestAnimationFrame(loop); };
+      const loop = () => { if (!this.listening) return; this.analyser.getByteFrequencyData(data); let sum = 0; for (const v of data) sum += v; this.energy = (sum / data.length) / 255; this.vizRAF = requestAnimationFrame(loop); };
       loop();
     } catch { this.fakeViz(); }
   },
-  fakeViz() { const loop = () => { if (!this.speaking && !this.listening) return; this.vizBars.forEach(b => b.style.height = 4 + Math.random() * 26 + 'px'); this.vizRAF = requestAnimationFrame(() => setTimeout(loop, 70)); }; loop(); },
-  stopViz() { if (this.vizRAF) cancelAnimationFrame(this.vizRAF); this.vizBars.forEach(b => b.style.height = '4px'); }
+  fakeViz() { const loop = () => { if (!this.speaking && !this.listening) { this.energy = 0; return; } this.energy = 0.25 + Math.random() * 0.55; this.vizRAF = requestAnimationFrame(() => setTimeout(loop, 60)); }; loop(); },
+  stopViz() { if (this.vizRAF) cancelAnimationFrame(this.vizRAF); this.energy = 0; }
 };
 
 function beep() { try { const c = Voice.audioCtx || new (window.AudioContext || window.webkitAudioContext)(); Voice.audioCtx = c; const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.value = .06; o.start(); o.stop(c.currentTime + .12); } catch {} }

@@ -44,22 +44,59 @@ function deleteNote(input, ctx) {
   return { ok: true, message: 'Usunięto notatkę.' };
 }
 
-// ---------- Baza wiedzy ----------
-function topicPath(store, name) { return store.dataPath('knowledge', slug(name) + '.md'); }
+// ---------- Baza wiedzy (Obsidian vault) ----------
+// Jeśli ustawiono vaultPath, zapisujemy tam (kompatybilnie z Obsidianem):
+// notatki markdown linkowane [[wikilinkami]] tworzą graf. Inaczej: userData/knowledge.
+function knowledgeDir(store) {
+  try {
+    const s = store.settings();
+    if (s && s.vaultPath && s.vaultPath.trim()) {
+      const d = s.vaultPath.trim();
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      return d;
+    }
+  } catch {}
+  return store.dataPath('knowledge');
+}
+function topicPath(store, name) { return path.join(knowledgeDir(store), slug(name) + '.md'); }
+function existingNames(store) {
+  try { return fs.readdirSync(knowledgeDir(store)).filter(f => f.endsWith('.md') && !f.startsWith('_')).map(f => f.replace(/\.md$/, '')); }
+  catch { return []; }
+}
+// zamienia wystąpienia nazw innych tematów w treści na [[wikilinki]] (graf)
+function autolink(content, names, self) {
+  let out = content;
+  for (const n of names) {
+    if (!n || n === slug(self)) continue;
+    const re = new RegExp('(?<!\\[\\[)\\b(' + n.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + ')\\b(?!\\]\\])', 'gi');
+    out = out.replace(re, '[[' + n + ']]');
+  }
+  return out;
+}
+function updateIndex(store) {
+  try {
+    const dir = knowledgeDir(store);
+    const names = existingNames(store);
+    const body = `# _Jarvis Index\n_graf wiedzy — automatycznie aktualizowany_\n\n` + names.map(n => `- [[${n}]]`).join('\n') + '\n';
+    fs.writeFileSync(path.join(dir, '_Jarvis Index.md'), body);
+  } catch {}
+}
 function saveTopic(input, ctx) {
   const name = (input.name || '').trim();
   const content = (input.content || '').trim();
   if (!name || !content) return { ok: false, error: 'Podaj nazwę tematu i treść.' };
-  const fp = topicPath(ctx.store, name);
+  const store = ctx.store;
+  const fp = topicPath(store, name);
   const exists = fs.existsSync(fp);
   const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const linked = autolink(content, existingNames(store), name);
   try {
     if (exists) {
-      // pogłębianie istniejącej wiedzy — dopisujemy datowaną sekcję
-      fs.appendFileSync(fp, `\n\n---\n## Aktualizacja ${stamp}\n${content}\n`);
+      fs.appendFileSync(fp, `\n\n---\n## Aktualizacja ${stamp}\n${linked}\n`);
     } else {
-      fs.writeFileSync(fp, `# ${name}\n_utworzono ${stamp}_\n\n${content}\n`);
+      fs.writeFileSync(fp, `---\ntags: [jarvis, wiedza]\nutworzono: ${stamp}\n---\n# ${name}\n\n${linked}\n`);
     }
+    updateIndex(store);
     ctx.emit('jarvis:event', { type: 'knowledge', name });
     return { ok: true, message: exists ? `Pogłębiono wiedzę o temacie „${name}”.` : `Zapisano nowy temat „${name}”.` };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -73,16 +110,17 @@ function readTopic(input, ctx) {
 
 // pomocnicze dla IPC / promptu
 function listTopics(store) {
+  const dir = knowledgeDir(store);
   try {
-    return fs.readdirSync(store.dataPath('knowledge')).filter(f => f.endsWith('.md')).map(f => {
-      const full = store.dataPath('knowledge', f);
-      let first = ''; try { const c = fs.readFileSync(full, 'utf8'); first = (c.split('\n').find(l => l && !l.startsWith('#') && !l.startsWith('_')) || '').slice(0, 120); } catch {}
+    return fs.readdirSync(dir).filter(f => f.endsWith('.md') && !f.startsWith('_')).map(f => {
+      const full = path.join(dir, f);
+      let first = ''; try { const c = fs.readFileSync(full, 'utf8'); first = (c.split('\n').find(l => l && !l.startsWith('#') && !l.startsWith('_') && !l.startsWith('---') && !l.includes(':')) || '').slice(0, 120); } catch {}
       return { file: f, name: f.replace(/\.md$/, ''), summary: first };
     });
   } catch { return []; }
 }
-function readTopicFile(store, name) { const fp = store.dataPath('knowledge', name.endsWith('.md') ? name : name + '.md'); try { return { ok: true, content: fs.readFileSync(fp, 'utf8') }; } catch (e) { return { ok: false, error: e.message }; } }
-function deleteTopicFile(store, name) { const fp = store.dataPath('knowledge', name.endsWith('.md') ? name : name + '.md'); try { fs.unlinkSync(fp); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } }
+function readTopicFile(store, name) { const fp = path.join(knowledgeDir(store), name.endsWith('.md') ? name : name + '.md'); try { return { ok: true, content: fs.readFileSync(fp, 'utf8') }; } catch (e) { return { ok: false, error: e.message }; } }
+function deleteTopicFile(store, name) { const fp = path.join(knowledgeDir(store), name.endsWith('.md') ? name : name + '.md'); try { fs.unlinkSync(fp); updateIndex(store); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } }
 
 // ---------- Data/godzina ----------
 function getDatetime() {

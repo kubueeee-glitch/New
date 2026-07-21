@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('jarvis', {
   deleteKnowledge: (name) => ipcRenderer.invoke('knowledge:delete', name),
   securityRecent: () => ipcRenderer.invoke('security:recent'),
   quarantineList: () => ipcRenderer.invoke('security:quarantine-list'),
+  listSkills: () => ipcRenderer.invoke('skills:list'),
 
   // sterowanie oknem
   winMinimize: () => ipcRenderer.send('win:minimize'),
