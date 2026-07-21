@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 @dataclass
 class S2Settings:
     default_model: str = "qwen2.5vl:7b"      # dobry OCR i rozumienie zrzutów
-    fast_model: str = "moondream2"           # szybki poziom pośredni
+    fast_model: str = "moondream"            # moondream2; tag w Ollamie: moondream
     code_ui_model: str = ""                  # np. InternVL 2.5 8B do kodu/UI
 
 

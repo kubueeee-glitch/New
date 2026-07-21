@@ -13,7 +13,7 @@ vision:
     # Pull na żądanie, nie na starcie — encoder wizji zjada ~1,4 GB VRAM
     # samą obecnością, na 8 GB to niedopuszczalne.
     default_model: "qwen2.5vl:7b"      # domyślny: dobry OCR i rozumienie zrzutów
-    fast_model: "moondream2"           # 1,9 B / ~2 GB — proste pytania
+    fast_model: "moondream"            # moondream2 (1,9 B / ~2 GB); tag w Ollamie: moondream
     code_ui_model: ""                  # np. InternVL 2.5 8B — zrzuty kodu i UI
 
 privacy:

@@ -126,8 +126,9 @@ class VisionPipeline:
         return answer, model, VisionLevel.S2
 
     def _save(self, shot) -> str:
-        os.makedirs(self.save_dir, exist_ok=True)
+        directory = os.path.expanduser(self.save_dir) or "."
+        os.makedirs(directory, exist_ok=True)
         path = os.path.join(
-            self.save_dir, time.strftime("jarvis-zrzut-%Y%m%d-%H%M%S.png")
+            directory, time.strftime("jarvis-zrzut-%Y%m%d-%H%M%S.png")
         )
         return save_png(shot, path)
