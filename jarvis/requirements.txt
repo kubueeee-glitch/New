@@ -5,3 +5,4 @@ rapidocr-onnxruntime>=1.3                  # S1: OCR na CPU (zamiennik: paddleoc
 numpy>=1.24
 PyYAML>=6.0
 uiautomation>=2.0 ; sys_platform == "win32"  # S0: drzewo kontrolek Windows
+pyttsx3>=2.90 ; sys_platform == "win32"      # lokalny TTS do demo („Patrzę.")

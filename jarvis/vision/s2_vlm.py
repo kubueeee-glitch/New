@@ -64,9 +64,26 @@ class VlmClient:
             return self.fast_model
         return self.default_model
 
+    def _model_available(self, model: str) -> bool:
+        try:
+            self._http(f"{self.ollama_url}/api/show", {"model": model})
+            return True
+        except Exception:
+            return False
+
+    def ensure_model(self, model: str) -> None:
+        """Pull na żądanie, nie na starcie — VLM dociąga się przy pierwszym
+        użyciu. Wołane PRZED sesją VRAM: pobieranie to dysk i sieć, nie VRAM,
+        więc model tekstowy może jeszcze spokojnie siedzieć w karcie."""
+        if not self._model_available(model):
+            self._http(
+                f"{self.ollama_url}/api/pull", {"model": model, "stream": False}
+            )
+
     def answer(self, question: str, shot: Screenshot) -> tuple[str, str]:
         """Zwraca (odpowiedź, użyty model). Obraz skalowany przed wysłaniem."""
         model = self.pick_model(question)
+        self.ensure_model(model)
         png = self._encoder(shot, max_long_side=self.max_long_side)
         image_b64 = base64.b64encode(png).decode("ascii")
         with self.vram.vlm_session(model):

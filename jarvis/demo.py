@@ -23,6 +23,27 @@ from .vision import CaptureScope, Trigger, TriggerSource, build_pipeline
 from .vision.vram import _default_http
 
 
+def make_speaker():
+    """Lokalny TTS (pyttsx3 — na Windows głosy SAPI5); gdy go nie ma, print.
+
+    Spec E8: natychmiastowe potwierdzenie głosem („patrzę") — cisza przez
+    6 sekund sprawia wrażenie zawieszenia.
+    """
+    try:
+        import pyttsx3
+
+        engine = pyttsx3.init()
+
+        def speak(text: str) -> None:
+            print(f"🔊 {text}", flush=True)
+            engine.say(text)
+            engine.runAndWait()
+
+        return speak
+    except Exception:
+        return lambda text: print(f"🔊 {text}", flush=True)
+
+
 def make_llm_answer(ollama_url: str, model: str):
     """Model tekstowy z Ollamy jako zaślepka routera LLM z E1–E7."""
 
@@ -74,7 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     pipeline = build_pipeline(
         cfg,
         llm_answer=make_llm_answer(cfg.vision.ollama_url, cfg.vision.text_model),
-        speak=lambda text: print(f"🔊 {text}", flush=True),
+        speak=make_speaker(),
     )
 
     if argv:

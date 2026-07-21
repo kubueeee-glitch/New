@@ -1,5 +1,6 @@
 import unittest
 
+from jarvis.tests.helpers import make_shot
 from jarvis.vision.s2_vlm import VlmClient
 from jarvis.vision.vram import VramManager
 
@@ -42,6 +43,40 @@ class PickModelTest(unittest.TestCase):
             client.pick_model("czy ten ekran wydaje się intuicyjny w obsłudze dla nowych osób"),
             "qwen2.5vl:7b",
         )
+
+
+class PullOnDemandTest(unittest.TestCase):
+    """Pull na żądanie, nie na starcie — VLM dociąga się przy pierwszym użyciu."""
+
+    def _run(self, available: bool):
+        calls = []
+
+        def http(url, payload):
+            calls.append((url.rsplit("/", 1)[-1], payload))
+            if url.endswith("/api/show") and not available:
+                raise RuntimeError("model not found")
+            return {"response": "opis"}
+
+        client = make_client(
+            code_ui_model="",
+            fast_model="",
+            http=http,
+            encoder=lambda shot, max_long_side=None: b"png",
+        )
+        answer, model = client.answer("opisz to", make_shot())
+        self.assertEqual(answer, "opis")
+        self.assertEqual(model, "qwen2.5vl:7b")
+        return [name for name, _ in calls]
+
+    def test_brakujacy_model_jest_dociagany(self):
+        names = self._run(available=False)
+        self.assertIn("pull", names)
+        self.assertLess(names.index("pull"), names.index("generate"))
+
+    def test_obecny_model_bez_pulla(self):
+        names = self._run(available=True)
+        self.assertNotIn("pull", names)
+        self.assertIn("generate", names)
 
 
 if __name__ == "__main__":

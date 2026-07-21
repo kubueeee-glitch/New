@@ -11,11 +11,12 @@ Implementacja etapu E8 ze specyfikacji [`docs/E8-WZROK.md`](docs/E8-WZROK.md):
 | S0 — drzewo kontrolek Windows UI Automation (~50 ms) | `vision/s0_uia.py` |
 | S1 — OCR na CPU: RapidOCR, awaryjnie PaddleOCR (~300 ms) | `vision/s1_ocr.py` |
 | S2 — VLM na żądanie: qwen2.5vl / InternVL / moondream2 | `vision/s2_vlm.py` |
+| Pull na żądanie, nie na starcie (auto-`ollama pull` przy pierwszym użyciu) | `vision/s2_vlm.py` (`ensure_model`) |
 | Menedżer VRAM: zwolnij tekstowy → VLM → przywróć, nigdy oba naraz | `vision/vram.py` |
 | Przechwytywanie `mss`: aktywne okno / cały ekran / monitor, skalowanie do ~1024 px | `vision/capture.py` |
 | Prywatność: zrzut tylko głosem, tylko w pamięci, lista wykluczeń, vault = tekst | `vision/privacy.py`, `vision/pipeline.py` |
 | Prompt injection: blok `<screen_content>`, ekran = DANE, akcje tylko głosem | `vision/sanitize.py`, `actions.py` |
-| Ack „Patrzę." przed S2 (cisza 6 s = wrażenie zawieszenia) | `vision/pipeline.py` |
+| Ack „Patrzę." przed S2 (cisza 6 s = wrażenie zawieszenia) | `vision/pipeline.py` + lokalny TTS w `demo.py` |
 | Konfiguracja (modele, wykluczenia) | `config.yaml`, `config.py` |
 
 ## Przebieg (`vision/pipeline.py`)
