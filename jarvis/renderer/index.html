@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'">
+<title>Jarvis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-cyan">
+
+  <!-- TITLEBAR -->
+  <div class="titlebar">
+    <div class="tb-brand"><span class="tb-dot"></span>JARVIS</div>
+    <div class="tb-actions">
+      <button class="tb-btn" id="btn-top" title="Zawsze na wierzchu">▢</button>
+      <button class="tb-btn" id="btn-min" title="Minimalizuj">—</button>
+      <button class="tb-btn close" id="btn-close" title="Ukryj do zasobnika">✕</button>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="tb-stat"><span class="tb-led" id="led-api"></span><span id="api-label">API: offline</span></div>
+    <div class="tb-stat"><span class="tb-led" id="led-mic"></span><span>Mikrofon</span></div>
+    <div class="tb-stat">Agenci: <b id="agents-active">0</b></div>
+    <div class="tb-stat" id="stat-sys">CPU/RAM: —</div>
+    <div class="tb-spacer"></div>
+    <div class="tb-stat" id="clock">--:--</div>
+    <div class="tb-nav">
+      <button data-panel="knowledge">Wiedza</button>
+      <button data-panel="security">Bezpieczeństwo</button>
+      <button data-panel="log">Log</button>
+      <button data-panel="settings">⚙ Ustawienia</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- SWARM -->
+    <div class="swarm">
+      <div class="swarm-h"><span>Rój agentów</span><span class="swarm-count" id="swarm-count">idle</span></div>
+      <div id="swarm-list"></div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center">
+      <div class="reactor-wrap">
+        <div class="reactor" id="reactor" data-state="idle">
+          <div class="r r-outer"></div><div class="r r-mid"></div><div class="r r-inner"></div>
+          <div class="r-pulse"></div><div class="r-core"></div>
+        </div>
+        <div class="reactor-info">
+          <div class="reactor-state" id="reactor-state">GOTOWY</div>
+          <div class="reactor-sub" id="reactor-sub">Powiedz „Hej Jarvis” albo napisz polecenie.</div>
+          <div class="voice-viz" id="voice-viz"></div>
+          <div class="auto-warn" id="auto-warn">⚠ AUTOMATYZACJA AKTYWNA — zatrzymaj: Ctrl+Shift+X</div>
+        </div>
+      </div>
+
+      <div class="chat" id="chat">
+        <div class="welcome" id="welcome">
+          <h2>Do usług, <span id="wname">Sir</span>.</h2>
+          <p>Jestem Jarvis — zarządzam zespołem agentów, którzy mogą działać równolegle: research w sieci, sterowanie komputerem, skanowanie bezpieczeństwa i porządkowanie wiedzy. Zacznij od dodania klucza API w Ustawieniach.</p>
+          <div class="chips" id="chips"></div>
+        </div>
+      </div>
+
+      <div class="inputbar">
+        <div class="input-row">
+          <button class="mic" id="mic" title="Mów">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+          </button>
+          <textarea class="input" id="input" rows="1" placeholder="Napisz do Jarvisa… (Enter wysyła, Shift+Enter nowa linia)"></textarea>
+          <button class="send" id="send" title="Wyślij">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANELS -->
+  <div class="overlay" id="overlay"></div>
+  <div class="panel" id="panel-settings">
+    <div class="panel-h"><h3>⚙ Ustawienia</h3><button class="tb-btn" data-close>✕</button></div>
+    <div class="panel-body" id="settings-body"></div>
+  </div>
+  <div class="panel" id="panel-knowledge">
+    <div class="panel-h"><h3>🧠 Baza wiedzy</h3><button class="tb-btn" data-close>✕</button></div>
+    <div class="panel-body" id="knowledge-body"></div>
+  </div>
+  <div class="panel" id="panel-security">
+    <div class="panel-h"><h3>🛡 Bezpieczeństwo</h3><button class="tb-btn" data-close>✕</button></div>
+    <div class="panel-body" id="security-body"></div>
+  </div>
+  <div class="panel" id="panel-log">
+    <div class="panel-h"><h3>📜 Log akcji</h3><button class="tb-btn" data-close>✕</button></div>
+    <div class="panel-body" id="log-body"></div>
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div class="modal-ovl" id="modal-ovl">
+    <div class="modal">
+      <div class="m-ic" id="m-ic">⚠️</div>
+      <h3 id="m-title">Potwierdzenie</h3>
+      <p id="m-msg"></p>
+      <div class="m-cmd" id="m-cmd" style="display:none"></div>
+      <div class="m-actions">
+        <button class="m-cancel" id="m-cancel">Anuluj</button>
+        <button class="m-ok" id="m-ok">Wykonaj</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "name": "jarvis-assistant",
+  "version": "1.0.0",
+  "description": "Jarvis — desktopowy asystent AI z głosem, wieloagentowością, researchem, pełną automatyzacją komputera i warstwą bezpieczeństwa.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  },
+  "optionalDependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.0"
+  },
+  "build": {
+    "appId": "com.jarvis.assistant",
+    "productName": "Jarvis",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "agents/**/*",
+      "tools/**/*",
+      "assets/**/*"
+    ],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}
