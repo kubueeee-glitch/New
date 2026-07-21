@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import threading
 from typing import Optional
 
 _CHUNK_CHARS = 500
@@ -16,11 +17,14 @@ class MemoryIndex:
         self.db_path = os.path.expanduser(db_path)
         self.vault_root = os.path.expanduser(vault_root)
         self._conn: Optional[sqlite3.Connection] = None
+        # indeksowanie biegnie z puli wątków (asyncio.to_thread) — jedno
+        # połączenie współdzielone, serializowane lockiem
+        self._lock = threading.Lock()
 
     def _db(self) -> sqlite3.Connection:
         if self._conn is None:
             os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
-            self._conn = sqlite3.connect(self.db_path)
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self._conn.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS notes USING fts5(path, chunk)"
             )
@@ -45,13 +49,14 @@ class MemoryIndex:
             yield buf
 
     def index_text(self, relpath: str, content: str) -> None:
-        db = self._db()
-        with db:
-            db.execute("DELETE FROM notes WHERE path = ?", (relpath,))
-            db.executemany(
-                "INSERT INTO notes (path, chunk) VALUES (?, ?)",
-                ((relpath, chunk) for chunk in self._chunks(content)),
-            )
+        with self._lock:
+            db = self._db()
+            with db:
+                db.execute("DELETE FROM notes WHERE path = ?", (relpath,))
+                db.executemany(
+                    "INSERT INTO notes (path, chunk) VALUES (?, ?)",
+                    ((relpath, chunk) for chunk in self._chunks(content)),
+                )
 
     def index_file(self, path: str) -> None:
         rel = os.path.relpath(path, self.vault_root)
@@ -75,9 +80,10 @@ class MemoryIndex:
             return []
         # prefiks (*) łagodzi polską odmianę: „sejf" znajdzie „sejfu"
         match = " OR ".join(f'"{t}"*' for t in tokens)
-        rows = self._db().execute(
-            "SELECT path, snippet(notes, 1, '', '', '…', 24) FROM notes "
-            "WHERE notes MATCH ? ORDER BY rank LIMIT ?",
-            (match, k),
-        ).fetchall()
+        with self._lock:
+            rows = self._db().execute(
+                "SELECT path, snippet(notes, 1, '', '', '…', 24) FROM notes "
+                "WHERE notes MATCH ? ORDER BY rank LIMIT ?",
+                (match, k),
+            ).fetchall()
         return [f"{snippet}  ({path})" for path, snippet in rows]

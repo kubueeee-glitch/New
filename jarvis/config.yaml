@@ -63,7 +63,9 @@ actions:                          # E5 — wyłącznie whitelist; log każdej ak
     - open_app
     - close_app
     - open_url
-    - set_volume
+    - volume_up
+    - volume_down
+    - mute
     - media_play_pause
     - note_add
   destructive:                    # zawsze potwierdzenie głosem
