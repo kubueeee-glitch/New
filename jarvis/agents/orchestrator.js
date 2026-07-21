@@ -5,7 +5,7 @@
  * (zwraca task_id od razu), więc kilku agentów biegnie równolegle;
  * collect_results czeka na wskazane zadania i zbiera wyniki.
  */
-const { runAgent, extractText } = require('./runner');
+const { runAgent } = require('./runner');
 const { buildRegistry } = require('./registry');
 const knowledge = require('../tools/knowledge');
 
@@ -80,7 +80,6 @@ ${knowBlock}`;
     const s = ctx.settings;
     const registry = buildRegistry(this.toolSchemas);
     const models = s.models || {};
-    const apiKey = s.apiKey.trim();
     const activeTasks = new Map();
     const abortRef = this.abortRef;
     const allHandlers = this.handlers;
@@ -98,7 +97,7 @@ ${knowBlock}`;
         system: def.system(ctx),
         tools: def.tools(),
         handlers: allHandlers,
-        ctx, apiKey, abortRef, maxSteps: 12
+        ctx, abortRef, maxSteps: 12
       }).then(r => ({ id, agent: input.agent, task: input.task, result: r.text }))
         .catch(e => ({ id, agent: input.agent, task: input.task, error: e.message }));
       activeTasks.set(id, { promise, agent: input.agent, task: input.task });
@@ -129,7 +128,6 @@ ${knowBlock}`;
     this.abortRef.stopped = false;
     this._actions = [];
     const s = this.ctx.settings;
-    const apiKey = s.apiKey.trim();
     const messages = mapHistory(history);
     messages.push({ role: 'user', content: userText });
 
@@ -141,7 +139,6 @@ ${knowBlock}`;
       tools: this.jarvisTools(),
       handlers: this.makeHandlers(),
       ctx: this.ctx,
-      apiKey,
       abortRef: this.abortRef,
       maxSteps: 16,
       maxTokens: 2048

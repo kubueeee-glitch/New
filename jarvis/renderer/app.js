@@ -37,9 +37,14 @@ async function init() {
 
 function applyTheme() { document.body.className = 'theme-' + (settings.theme || 'cyan'); }
 function updateApiLed() {
+  if (settings.provider === 'ollama') {
+    $('led-api').classList.add('on');
+    $('api-label').textContent = 'Ollama: ' + (settings.ollamaModel || 'lokalnie');
+    return;
+  }
   const ok = settings.apiKey && settings.apiKey.trim().length > 10;
   $('led-api').classList.toggle('on', ok);
-  $('api-label').textContent = ok ? 'API: gotowe' : 'API: brak klucza';
+  $('api-label').textContent = ok ? 'Claude: gotowe' : 'API: brak klucza';
 }
 
 // ================= SWARM =================
@@ -114,7 +119,7 @@ function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
 async function send() {
   const ta = $('input'); const text = ta.value.trim();
   if (!text || busy) return;
-  if (!settings.apiKey || settings.apiKey.trim().length < 10) { toast('🔑 Dodaj klucz API w Ustawieniach.'); openPanel('settings'); return; }
+  if (settings.provider !== 'ollama' && (!settings.apiKey || settings.apiKey.trim().length < 10)) { toast('🔑 Dodaj klucz API lub przełącz na Ollamę (za darmo) w Ustawieniach.'); openPanel('settings'); return; }
   ta.value = ''; ta.style.height = 'auto';
   addMsg('user', text); history.push({ role: 'user', content: text });
   busy = true; reflectReactor(); showTyping();
@@ -186,7 +191,17 @@ function renderSettings() {
   const tog = (key, label) => `<div class="switch"><span>${label}</span><div class="tog ${s[key] ? 'on' : ''}" data-tog="${key}"><i></i></div></div>`;
   $('settings-body').innerHTML = `
     <div class="field"><label>Jak mam się do Ciebie zwracać</label><input id="set-userName" value="${esc(s.userName)}"></div>
-    <div class="field"><label>Klucz API Anthropic</label><input id="set-apiKey" type="password" value="${esc(s.apiKey)}" placeholder="sk-ant-..."><div class="hint">Uzyskasz go na console.anthropic.com. Przechowywany lokalnie, nigdzie nie wysyłany poza API Anthropic.</div></div>
+    <div class="field"><label>Silnik AI (mózg Jarvisa)</label><select id="set-provider">
+      <option value="anthropic" ${s.provider !== 'ollama' ? 'selected' : ''}>Anthropic Claude (płatne API)</option>
+      <option value="ollama" ${s.provider === 'ollama' ? 'selected' : ''}>Ollama — lokalnie, za darmo</option>
+    </select><div class="hint">Ollama = model na Twoim komputerze: 0 zł, offline, prywatnie. Wymaga zainstalowania z ollama.com.</div></div>
+    <div id="box-ollama" style="display:${s.provider === 'ollama' ? 'block' : 'none'}">
+      <div class="field"><label>Adres Ollama</label><input id="set-ollamaUrl" value="${esc(s.ollamaUrl)}" placeholder="http://localhost:11434"></div>
+      <div class="field"><label>Model Ollama</label><input id="set-ollamaModel" value="${esc(s.ollamaModel)}" placeholder="qwen2.5:7b"><div class="hint">Najpierw pobierz model, np. w terminalu: <b>ollama pull qwen2.5:7b</b> (dobra obsługa narzędzi). Mocniejszy: qwen2.5:14b.</div></div>
+    </div>
+    <div id="box-anthropic" style="display:${s.provider === 'ollama' ? 'none' : 'block'}">
+      <div class="field"><label>Klucz API Anthropic</label><input id="set-apiKey" type="password" value="${esc(s.apiKey)}" placeholder="sk-ant-..."><div class="hint">Uzyskasz go na console.anthropic.com (płatne za użycie). Przechowywany lokalnie.</div></div>
+    </div>
     <div class="field"><label>Klucz API VirusTotal (skaner)</label><input id="set-vtKey" type="password" value="${esc(s.virusTotalKey)}" placeholder="opcjonalny"><div class="hint">Darmowy na virustotal.com — bez niego skanowanie plików nie działa.</div></div>
     <div class="field"><label>Model — Jarvis (orkiestrator)</label>${modelSel('orchestrator')}</div>
     <div class="row2">
@@ -210,6 +225,11 @@ function renderSettings() {
     <div id="mem-list"></div>`;
   fillVoices();
   document.querySelectorAll('#settings-body .tog').forEach(t => t.onclick = () => t.classList.toggle('on'));
+  $('set-provider').onchange = (e) => {
+    const ol = e.target.value === 'ollama';
+    $('box-ollama').style.display = ol ? 'block' : 'none';
+    $('box-anthropic').style.display = ol ? 'none' : 'block';
+  };
   $('set-save').onclick = saveSettings;
   loadMemory();
 }
@@ -223,7 +243,10 @@ function fillVoices() {
 async function saveSettings() {
   const s = Object.assign({}, settings);
   s.userName = $('set-userName').value.trim() || 'Sir';
+  s.provider = $('set-provider').value;
   s.apiKey = $('set-apiKey').value.trim();
+  s.ollamaUrl = $('set-ollamaUrl').value.trim() || 'http://localhost:11434';
+  s.ollamaModel = $('set-ollamaModel').value.trim() || 'qwen2.5:7b';
   s.virusTotalKey = $('set-vtKey').value.trim();
   s.theme = $('set-theme').value;
   s.voiceName = $('set-voice').value;

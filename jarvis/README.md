@@ -1,9 +1,10 @@
 # Jarvis — desktopowy asystent AI
 
-Asystent w stylu „Jarvisa" jako aplikacja desktopowa (Electron). Mózgiem jest
-Claude (API Anthropic), a wokół niego zbudowano **zespół agentów działających
-równolegle**, głos z wake wordem, research z rosnącą bazą wiedzy, pełne
-sterowanie komputerem i warstwę skanowania bezpieczeństwa — wszystko w
+Asystent w stylu „Jarvisa" jako aplikacja desktopowa (Electron). Mózgiem może
+być **Claude (API Anthropic)** albo **model lokalny przez Ollamę (za darmo,
+offline)** — wybierasz w ustawieniach. Wokół niego zbudowano **zespół agentów
+działających równolegle**, głos z wake wordem, research z rosnącą bazą wiedzy,
+pełne sterowanie komputerem i warstwę skanowania bezpieczeństwa — wszystko w
 futurystycznym interfejsie HUD.
 
 > Interfejs, komunikaty i osobowość są po polsku.
@@ -43,11 +44,32 @@ futurystycznym interfejsie HUD.
 ## Wymagania
 
 - **Node.js 18+** (zalecane 20+)
-- **Klucz API Anthropic** — z [console.anthropic.com](https://console.anthropic.com)
-  (wklejasz w Ustawieniach; przechowywany lokalnie).
+- **Mózg AI — jedno z dwóch:**
+  - **Ollama** (za darmo, lokalnie) — [ollama.com](https://ollama.com), patrz sekcja niżej, **albo**
+  - **Klucz API Anthropic** — z [console.anthropic.com](https://console.anthropic.com) (płatne za użycie).
 - **Klucz VirusTotal** (opcjonalny, darmowy) — do skanowania plików.
 - Do sterowania myszą/klawiaturą: biblioteka `nut-js` instaluje się z `npm install`
   (na niektórych systemach może wymagać narzędzi kompilacji).
+
+> Research (wyszukiwanie w internecie) działa za darmo przez DuckDuckGo — bez
+> żadnego klucza — niezależnie od wybranego mózgu AI.
+
+## Za darmo — tryb Ollama (lokalnie, offline)
+
+Model działa na Twoim komputerze: 0 zł, prywatnie, bez internetu (poza researchem).
+
+1. Zainstaluj **Ollama** z [ollama.com](https://ollama.com).
+2. Pobierz model z dobrą obsługą narzędzi (w terminalu):
+   ```bash
+   ollama pull qwen2.5:7b        # lekki, szybki (~5 GB, mieści się na 8 GB VRAM)
+   # ollama pull qwen2.5:14b     # mocniejszy, jeśli masz zapas VRAM/RAM
+   ```
+3. Upewnij się, że Ollama działa (zwykle startuje sama; ewentualnie `ollama serve`).
+4. W Jarvisie: **⚙ Ustawienia → Silnik AI → „Ollama"**, wpisz model (np. `qwen2.5:7b`) i zapisz.
+
+Zalecany sprzęt: karta z ~8 GB VRAM (np. RTX 3060 Ti) i 16 GB+ RAM dla modeli 7–8B.
+Model lokalny 7–8B jest słabszy od Claude w złożonej orkiestracji wielu agentów,
+ale do większości zadań w zupełności wystarcza.
 
 ## Uruchomienie
 
@@ -57,7 +79,8 @@ npm install
 npm start
 ```
 
-Przy pierwszym starcie otwórz **⚙ Ustawienia** i wklej klucz API Anthropic.
+Przy pierwszym starcie otwórz **⚙ Ustawienia** i albo przełącz **Silnik AI** na
+**Ollamę** (za darmo), albo wklej klucz API Anthropic.
 
 ## Zbudowanie instalatora (opcjonalnie)
 
@@ -87,18 +110,22 @@ jarvis/
     runner.js        pętla tool_use jednego agenta (+ wizja, przerwanie, limity)
     registry.js      definicje wyspecjalizowanych agentów
     orchestrator.js  Jarvis: dekompozycja i równoległe uruchamianie agentów
+    llm.js           wybór providera (Anthropic / Ollama)
+    providers/       anthropic.js, ollama.js — znormalizowany format wiadomości
   tools/
     system.js        aplikacje, URL, system, schowek, polecenia, pliki
     automation.js    mysz/klawiatura/okna (nut-js) + zrzut ekranu (wizja)
     security.js      skaner VirusTotal, watcher Pobranych, procesy, kwarantanna
     knowledge.js     pamięć, notatki, baza wiedzy, data, kalkulator, makra
+    websearch.js     darmowe wyszukiwanie w sieci (DuckDuckGo, bez klucza)
   renderer/          interfejs HUD (index.html, style.css, app.js) + głos
 ```
 
 Agenci i narzędzia żyją w procesie głównym (Node — brak problemów z CORS, klucz
 API nie trafia do warstwy web). Renderer odpowiada za interfejs oraz głos
-(synteza mowy i rozpoznawanie mowy). Wywołania Claude API wzorowane są na
-działającym rozwiązaniu z aplikacji HabitFlow w tym repozytorium.
+(synteza mowy i rozpoznawanie mowy). Warstwa `llm` tłumaczy neutralny format
+wiadomości na wybrany silnik (Claude API albo lokalna Ollama), więc ten sam
+kod agentów działa z oboma.
 
 ---
 
@@ -109,9 +136,11 @@ działającym rozwiązaniu z aplikacji HabitFlow w tym repozytorium.
    zastępuje Windows Defendera** — współpracuje z nim.
 2. **Model się nie dotrenowuje.** „Uczenie się" to rosnąca baza notatek z
    researchu, a nie zmiana wag modelu. Świeże informacje wymagają researchu.
-3. **Wymaga klucza API Anthropic i internetu** do rozmów i researchu (research
-   generuje dodatkowy, drobny koszt za wyszukiwania). Skanowanie wymaga klucza
-   VirusTotal. Synteza mowy działa lokalnie.
+3. **Koszt zależy od wybranego mózgu.** Tryb Anthropic jest płatny za użycie
+   (API to nie to samo co subskrypcja Claude.ai — trzeba doładować konto).
+   Tryb **Ollama jest darmowy** (model lokalny). Research przez DuckDuckGo jest
+   darmowy w obu trybach, ale wymaga internetu. Skanowanie wymaga (darmowego)
+   klucza VirusTotal. Synteza mowy działa lokalnie.
 4. **Rozpoznawanie mowy zależy od środowiska.** Wykorzystuje Web Speech API
    przeglądarki Chromium — w niektórych buildach Electrona bywa zawodne lub
    niedostępne (błąd `network`); wtedy działa pole tekstowe. Wake word wymaga

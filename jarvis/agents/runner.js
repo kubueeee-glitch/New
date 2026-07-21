@@ -1,18 +1,16 @@
 'use strict';
 /*
- * runAgent — pojedyncza pętla agentowa tool_use dla jednego agenta.
- * Obsługuje: wykonywanie narzędzi lokalnych, obrazy w wynikach (wizja),
- * stop_reason 'pause_turn' (długie narzędzia serwerowe), przerwanie (abortRef)
- * i limit kroków. Raportuje status do UI przez ctx.emit('jarvis:agent', ...).
+ * runAgent — pojedyncza pętla agentowa (tool-use) niezależna od providera.
+ * Używa neutralnego formatu wiadomości i warstwy llm (Anthropic lub Ollama).
+ * Neutralne wiadomości:
+ *   { role:'user', content:string }
+ *   { role:'assistant', content:string, toolCalls:[{id,name,input}] }
+ *   { role:'tool', results:[{id,name,output,image?}] }
  */
-const { callClaude } = require('./anthropic');
+const llm = require('./llm');
 
 async function runAgent(opts) {
-  const {
-    name, model, system, tools, handlers, ctx, apiKey,
-    abortRef = { stopped: false }, maxSteps = 14, maxTokens = 2048,
-    onStep
-  } = opts;
+  const { name, model, system, tools, handlers, ctx, abortRef = { stopped: false }, maxSteps = 14, maxTokens = 2048, onStep } = opts;
   let messages = opts.messages.slice();
 
   ctx.emit('jarvis:agent', { name, status: 'thinking', step: 0 });
@@ -20,54 +18,32 @@ async function runAgent(opts) {
   for (let step = 0; step < maxSteps; step++) {
     if (abortRef.stopped) { ctx.emit('jarvis:agent', { name, status: 'stopped' }); return { text: '⏹️ Zatrzymano.', messages, stopped: true }; }
 
-    const resp = await callClaude({ apiKey, model, system, messages, tools, maxTokens });
-    messages.push({ role: 'assistant', content: resp.content });
+    const resp = await llm.chat(ctx.settings, { model, system, messages, tools, maxTokens });
+    messages.push({ role: 'assistant', content: resp.text, toolCalls: resp.toolCalls });
 
-    // stop_reason pause_turn — kontynuuj bez dokładania wyników
-    if (resp.stop_reason === 'pause_turn') { continue; }
-
-    if (resp.stop_reason !== 'tool_use') {
-      const text = extractText(resp.content);
+    if (resp.stopReason === 'pause') continue;
+    if (resp.stopReason !== 'tool_use' || !resp.toolCalls.length) {
       ctx.emit('jarvis:agent', { name, status: 'done', step: step + 1 });
-      return { text, messages };
+      return { text: resp.text || '…', messages };
     }
 
-    // Wykonaj wszystkie lokalne narzędzia z tej tury
-    const toolUses = resp.content.filter(b => b.type === 'tool_use');
-    const toolResults = [];
-    for (const tu of toolUses) {
+    const results = [];
+    for (const tc of resp.toolCalls) {
       if (abortRef.stopped) break;
-      const handler = handlers[tu.name];
-      ctx.emit('jarvis:agent', { name, status: 'acting', tool: tu.name, step: step + 1 });
-      if (onStep) onStep({ tool: tu.name, input: tu.input });
-      let result;
-      try {
-        result = handler ? await handler(tu.input || {}, ctx) : { ok: false, error: 'Nieznane narzędzie: ' + tu.name };
-      } catch (e) {
-        result = { ok: false, error: (e && e.message) || String(e) };
-      }
-      toolResults.push(buildToolResult(tu.id, result));
+      const handler = handlers[tc.name];
+      ctx.emit('jarvis:agent', { name, status: 'acting', tool: tc.name, step: step + 1 });
+      if (onStep) onStep({ tool: tc.name, input: tc.input });
+      let output;
+      try { output = handler ? await handler(tc.input || {}, ctx) : { ok: false, error: 'Nieznane narzędzie: ' + tc.name }; }
+      catch (e) { output = { ok: false, error: (e && e.message) || String(e) }; }
+      const image = output && output.__image_base64;
+      results.push({ id: tc.id, name: tc.name, output, image });
     }
-    messages.push({ role: 'user', content: toolResults });
+    messages.push({ role: 'tool', results });
   }
 
   ctx.emit('jarvis:agent', { name, status: 'done', note: 'limit-kroków' });
   return { text: 'Osiągnięto limit kroków agenta.', messages };
 }
 
-function extractText(content) {
-  return (content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || '…';
-}
-
-// Buduje blok tool_result; jeśli wynik zawiera obraz (__image_base64),
-// dołącza go jako blok image (dla modelu z wizją).
-function buildToolResult(toolUseId, result) {
-  const img = result && result.__image_base64;
-  const clean = Object.assign({}, result);
-  delete clean.__image_base64;
-  const content = [{ type: 'text', text: JSON.stringify(clean).slice(0, 6000) }];
-  if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: img } });
-  return { type: 'tool_result', tool_use_id: toolUseId, content, is_error: result && result.ok === false };
-}
-
-module.exports = { runAgent, extractText };
+module.exports = { runAgent };

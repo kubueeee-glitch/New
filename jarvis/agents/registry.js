@@ -5,18 +5,15 @@
  * uruchamiać kilku równolegle.
  */
 
-// Serwerowe narzędzie wyszukiwania Anthropic (dla Researchera)
-const WEB_SEARCH = { type: 'web_search_20250305', name: 'web_search', max_uses: 6 };
-
 function pick(schemas, names) { return schemas.filter(s => names.includes(s.name)); }
 
 function buildRegistry(toolSchemas) {
-  const sys = toolSchemas.system, auto = toolSchemas.automation, sec = toolSchemas.security, kn = toolSchemas.knowledge;
+  const sys = toolSchemas.system, auto = toolSchemas.automation, sec = toolSchemas.security, kn = toolSchemas.knowledge, web = toolSchemas.web || [];
 
   return {
     Researcher: {
       model: 'Researcher',
-      tools: () => [WEB_SEARCH, ...pick(kn, ['save_topic', 'read_topic', 'remember'])],
+      tools: () => [...web, ...pick(kn, ['save_topic', 'read_topic', 'remember'])],
       system: () =>
 `Jesteś Researcher — agent-badacz w systemie Jarvis. Zadanie dostajesz od orkiestratora.
 Szukaj informacji w internecie (web_search), syntetyzuj rzetelnie i ZAWSZE podawaj źródła (URL).
@@ -57,4 +54,4 @@ Odpowiadaj po polsku, zwięźle.`
   };
 }
 
-module.exports = { buildRegistry, WEB_SEARCH };
+module.exports = { buildRegistry };

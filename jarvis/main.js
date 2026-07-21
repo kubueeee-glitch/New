@@ -32,7 +32,10 @@ function writeJSON(file, obj) {
 
 const DEFAULT_SETTINGS = {
   userName: 'Sir',
+  provider: 'anthropic',           // 'anthropic' | 'ollama'
   apiKey: '',
+  ollamaUrl: 'http://localhost:11434',
+  ollamaModel: 'qwen2.5:7b',
   virusTotalKey: '',
   models: {
     orchestrator: 'claude-opus-4-8',
@@ -173,17 +176,19 @@ const system = require('./tools/system');
 const automation = require('./tools/automation');
 const security = require('./tools/security');
 const knowledge = require('./tools/knowledge');
+const websearch = require('./tools/websearch');
 const { Orchestrator } = require('./agents/orchestrator');
 
 // zbiór wszystkich handlerów narzędzi
 const allHandlers = Object.assign({},
-  system.handlers, automation.handlers, security.handlers, knowledge.handlers
+  system.handlers, automation.handlers, security.handlers, knowledge.handlers, websearch.handlers
 );
 const toolSchemas = {
   system: system.schemas,
   automation: automation.schemas,
   security: security.schemas,
-  knowledge: knowledge.schemas
+  knowledge: knowledge.schemas,
+  web: websearch.schemas
 };
 
 let orchestrator = null;
@@ -197,8 +202,8 @@ function getOrchestrator() {
 // ---------- IPC: rozmowa ----------
 ipcMain.handle('jarvis:send', async (_e, { text, history }) => {
   const s = store.settings();
-  if (!s.apiKey || s.apiKey.trim().length < 10) {
-    return { error: 'no-key', message: 'Dodaj klucz API Anthropic w Ustawieniach.' };
+  if (s.provider !== 'ollama' && (!s.apiKey || s.apiKey.trim().length < 10)) {
+    return { error: 'no-key', message: 'Dodaj klucz API Anthropic w Ustawieniach — albo przełącz się na Ollamę (za darmo).' };
   }
   try {
     const result = await getOrchestrator().run(text, history || []);
