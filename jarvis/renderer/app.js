@@ -9,6 +9,10 @@ let settings = null;
 let history = [];           // {role:'user'|'ai', content}
 let busy = false;
 const metrics = { msgs: 0, tokens: 0, agentRuns: 0, start: Date.now() };
+
+// Widoczne błędy — żeby cokolwiek, co się wysypie, było od razu widać.
+window.addEventListener('error', (e) => { try { toast('⚠️ Błąd: ' + (e.message || e.error)); } catch {} });
+window.addEventListener('unhandledrejection', (e) => { try { toast('⚠️ Błąd: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); } catch {} });
 const AGENTS = [
   { id: 'Jarvis', icon: '🧠' }, { id: 'Researcher', icon: '🔎' },
   { id: 'Operator', icon: '🖱️' }, { id: 'Guard', icon: '🛡️' }, { id: 'Archivist', icon: '🗂️' }
@@ -342,24 +346,29 @@ function fillVoices() {
   sel.innerHTML = '<option value="">(domyślny systemowy)</option>' + list.map(v => `<option ${settings.voiceName === v.name ? 'selected' : ''}>${esc(v.name)}</option>`).join('');
 }
 async function saveSettings() {
-  const s = Object.assign({}, settings);
-  s.userName = $('set-userName').value.trim() || 'Sir';
-  s.provider = $('set-provider').value;
-  s.apiKey = $('set-apiKey').value.trim();
-  s.ollamaUrl = $('set-ollamaUrl').value.trim() || 'http://localhost:11434';
-  s.ollamaModel = $('set-ollamaModel').value.trim() || 'qwen2.5:7b';
-  s.virusTotalKey = $('set-vtKey').value.trim();
-  s.vaultPath = $('set-vault').value.trim();
-  s.localVoiceUrl = $('set-localVoice').value.trim();
-  s.theme = $('set-theme').value;
-  s.voiceName = $('set-voice').value;
-  s.models = Object.assign({}, s.models);
-  document.querySelectorAll('#settings-body [data-model]').forEach(el => s.models[el.dataset.model] = el.value);
-  document.querySelectorAll('#settings-body .tog').forEach(t => s[t.dataset.tog] = t.classList.contains('on'));
-  settings = await J.setSettings(s);
-  applyTheme(); updateApiLed(); $('wname').textContent = settings.userName;
-  Voice.applySettings(); renderDocuments();
-  toast('✅ Zapisano.'); closePanels();
+  try {
+    const val = (id) => { const el = $(id); return el ? el.value : ''; };
+    const s = Object.assign({}, settings);
+    s.userName = val('set-userName').trim() || 'Sir';
+    s.provider = val('set-provider');
+    s.apiKey = val('set-apiKey').trim();
+    s.ollamaUrl = val('set-ollamaUrl').trim() || 'http://localhost:11434';
+    s.ollamaModel = val('set-ollamaModel').trim() || 'qwen2.5:7b';
+    s.virusTotalKey = val('set-vtKey').trim();
+    s.vaultPath = val('set-vault').trim();
+    s.localVoiceUrl = val('set-localVoice').trim();
+    s.theme = val('set-theme') || 'green';
+    s.voiceName = val('set-voice');
+    s.models = Object.assign({}, s.models);
+    document.querySelectorAll('#settings-body [data-model]').forEach(el => s.models[el.dataset.model] = el.value);
+    document.querySelectorAll('#settings-body .tog').forEach(t => s[t.dataset.tog] = t.classList.contains('on'));
+    settings = await J.setSettings(s);
+    applyTheme(); updateApiLed(); $('wname').textContent = settings.userName;
+    Voice.applySettings(); renderDocuments();
+    toast('✅ Zapisano.'); closePanels();
+  } catch (e) {
+    toast('⚠️ Nie udało się zapisać: ' + (e && e.message ? e.message : e));
+  }
 }
 async function loadMemory() {
   const mem = await J.getMemory();
