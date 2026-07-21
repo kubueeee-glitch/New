@@ -271,7 +271,7 @@ function wireInput() {
 
 // ================= PANELS =================
 function wirePanels() {
-  document.querySelectorAll('.tb-nav button').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
+  document.querySelectorAll('[data-panel]').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
   document.querySelectorAll('[data-close]').forEach(b => b.onclick = closePanels);
   $('overlay').onclick = closePanels;
 }
