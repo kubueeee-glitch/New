@@ -23,25 +23,28 @@ const CHIPS = ['Która godzina?', 'Zrób research: najlepsze GPU do 2000 zł', '
 // ================= INIT =================
 init();
 async function init() {
-  settings = await J.getSettings();
-  applyTheme();
-  renderSwarm();
-  renderChips();
-  wireWindow();
-  wireInput();
-  wirePanels();
-  wireModal();
-  subscribe();
-  startClock();
-  Voice.init();
-  Sphere.init();
-  renderDocuments();
-  renderSkillsPanel();
-  renderMetrics();
-  updateCounter();
-  const wn0 = $('wname'); if (wn0) wn0.textContent = settings.userName || 'Sir';
-  updateApiLed();
-  setInterval(renderMetrics, 4000);
+  try { settings = await J.getSettings(); } catch (e) { console.error('getSettings', e); }
+  if (!settings) settings = {};
+  const safe = (fn, label) => { try { fn(); } catch (e) { console.error(label, e); try { toast('⚠️ ' + label + ': ' + e.message); } catch {} } };
+  // Krytyczne wiązania NAJPIERW — żeby przyciski działały nawet jeśli reszta padnie.
+  safe(wireWindow, 'wireWindow');
+  safe(wireInput, 'wireInput');
+  safe(wirePanels, 'wirePanels');
+  safe(wireModal, 'wireModal');
+  safe(subscribe, 'subscribe');
+  safe(applyTheme, 'applyTheme');
+  safe(renderSwarm, 'renderSwarm');
+  safe(renderChips, 'renderChips');
+  safe(startClock, 'startClock');
+  safe(() => Voice.init(), 'Voice.init');
+  safe(() => Sphere.init(), 'Sphere.init');
+  safe(renderMetrics, 'renderMetrics');
+  safe(updateCounter, 'updateCounter');
+  safe(updateApiLed, 'updateApiLed');
+  const wn0 = $('wname'); if (wn0) wn0.textContent = (settings.userName) || 'Sir';
+  try { await renderDocuments(); } catch (e) { console.error('renderDocuments', e); }
+  try { await renderSkillsPanel(); } catch (e) { console.error('renderSkillsPanel', e); }
+  setInterval(() => { try { renderMetrics(); } catch {} }, 4000);
 }
 
 function applyTheme() { document.body.className = 'theme-' + (settings.theme || 'green'); }

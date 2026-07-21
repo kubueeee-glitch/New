@@ -5,7 +5,7 @@
  * oraz uruchamia orkiestratora wieloagentowego i wykonuje narzędzia OS.
  * Renderer odpowiada wyłącznie za interfejs i głos (TTS/STT).
  */
-const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, desktopCapturer, shell, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, desktopCapturer, shell, dialog, nativeImage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -275,6 +275,16 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     ensureDirs();
+    // Zgoda na mikrofon/media — w Electronie domyślnie zablokowane, przez co
+    // nasłuch (rozpoznawanie mowy) nie miał dostępu do mikrofonu.
+    try {
+      session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
+        cb(['media', 'audioCapture', 'mediaKeySystem', 'notifications'].includes(permission));
+      });
+      if (session.defaultSession.setPermissionCheckHandler) {
+        session.defaultSession.setPermissionCheckHandler((_wc, permission) => ['media', 'audioCapture'].includes(permission));
+      }
+    } catch (e) { console.error('permissions', e); }
     createWindow();
     buildTray();
     registerShortcuts();
