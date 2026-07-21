@@ -102,6 +102,7 @@ ${knowBlock}`;
         system: def.system(ctx),
         tools: def.tools(),
         handlers: allHandlers,
+        messages: [{ role: 'user', content: input.task }],
         ctx, abortRef, maxSteps: 12
       }).then(r => ({ id, agent: input.agent, task: input.task, result: r.text }))
         .catch(e => ({ id, agent: input.agent, task: input.task, error: e.message }));

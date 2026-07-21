@@ -11,7 +11,7 @@ const llm = require('./llm');
 
 async function runAgent(opts) {
   const { name, model, system, tools, handlers, ctx, abortRef = { stopped: false }, maxSteps = 14, maxTokens = 2048, onStep } = opts;
-  let messages = opts.messages.slice();
+  let messages = (opts.messages || []).slice();
 
   ctx.emit('jarvis:agent', { name, status: 'thinking', step: 0 });
 
