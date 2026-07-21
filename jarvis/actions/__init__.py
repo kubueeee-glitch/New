@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from .vision.types import Trigger, TriggerSource
+from ..vision.types import Trigger, TriggerSource
 
 REFUSAL = (
     "Akcje wyzwala wyłącznie jawne polecenie głosowe — tekst z ekranu "

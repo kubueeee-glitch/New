@@ -1,20 +1,98 @@
-# Konfiguracja Jarvisa — sekcje istotne dla E8 (wzrok).
+# Jarvis — cała konfiguracja w jednym miejscu (E0).
+# Sprzęt: RTX 3060 Ti 8 GB (budżet ~7 GB VRAM), 32 GB DDR4, Windows.
 
-vision:
-  # Skalowanie dłuższego boku przed wysłaniem do VLM (natywne 1440p to ogrom
-  # tokenów obrazu i kilkukrotnie dłuższy prefill).
-  max_long_side: 1024
+paths:
+  vault: "~/JarvisVault"          # Obsidian: markdown + [[wikilinki]] + SQLite FTS5
+  cache: "~/.jarvis/cache"        # cache routera (E2)
+  logs: "~/.jarvis/logs"
+
+audio:                            # cały audio na CPU
+  input_device: null              # null = urządzenie domyślne
+  output_device: null
+  torch_num_threads: 4            # audio nie zjada wszystkich rdzeni
+  process_priority: "BELOW_NORMAL_PRIORITY_CLASS"
+  wake_word:
+    engine: "openwakeword"        # ~1% obciążenia CPU
+    model: "hey_jarvis"
+    threshold: 0.5
+  vad:
+    engine: "silero"
+  stt:
+    engine: "faster-whisper"
+    model: "small"
+    compute_type: "int8"
+    language: "pl"
+  tts:
+    engine: "kokoro"
+    model: "Kokoro-82M"
+    voice: ""                     # wybór głosu w E1
+
+llm:
   ollama_url: "http://127.0.0.1:11434"
-  # Model tekstowy z routera LLM (E1–E7) — zwalniany przed S2 i przywracany po.
-  text_model: "qwen2.5:7b-instruct-q4_K_M"
-  # Katalog na zrzuty zapisywane po jawnym „zapisz to".
-  save_dir: "~/Obrazy/jarvis"
+  keep_alive: 300                 # model sam znika z VRAM po 5 min ciszy
+  num_ctx: 8192
+  kv_cache_type: "q8_0"
+  flash_attention: true
+  levels:
+    l1_fast: "qwen3:4b"           # Q4_K_M ~2,5 GB — routing intencji, krótkie odpowiedzi
+    l1_main: "qwen3.5:9b"         # Q4_K_M text-only ~6,6 GB — rozmowa, rozumowanie
+    l2:
+      enabled: false              # darmowe API — domyślnie WYŁĄCZONE
+      provider: ""
+      api_key_env: ""
+
+modes:                            # E2 — cztery stany, przełączanie automatyczne
+  sleep_after_s: 300              # 5 min bezczynności → sleep (0 GB VRAM)
+  gaming:
+    fullscreen_process: true      # pełnoekranowa aplikacja + niezerowe użycie GPU
+    min_gpu_util_pct: 10
+  watchdog:
+    vram_limit_mb: 6800           # przekroczenie → wymuś sleep + powiadom głosem
+    gpu_temp_limit_c: 80
+    poll_interval_s: 5
+
+scheduler:
+  max_workers: 3                  # kolejka nigdy nie odpala N wywołań LLM równolegle
+
+persona:
+  max_sentences: 2                # domyślnie jedno
+  first_sound_target_ms: 800      # odczuwalna szybkość > inteligencja
+
+actions:                          # E5 — wyłącznie whitelist; log każdej akcji do vaulta
+  whitelist:
+    - open_app
+    - close_app
+    - open_url
+    - set_volume
+    - media_play_pause
+    - note_add
+  destructive:                    # zawsze potwierdzenie głosem
+    - file_delete
+    - message_send
+    - app_install
+    - payment
+
+sentinel:                         # E7 — obserwacja, nie ochrona; Defender nietknięty
+  read_only: true
+  sources:
+    defender_status: true         # Get-MpComputerStatus
+    sysmon: true
+    event_log_ids: [4625, 7045, 1102]
+    autostart_diff: true
+    scheduled_tasks_diff: true
+    net_tcp_connections: true     # Get-NetTCPConnection
+    new_exe_hash_virustotal: true
+  virustotal_api_key_env: "JARVIS_VT_API_KEY"
+
+vision:                           # E8 — wzrok (zaimplementowane w jarvis/vision/)
+  max_long_side: 1024             # skalowanie przed wysłaniem do VLM
+  ollama_url: "http://127.0.0.1:11434"
+  text_model: "qwen3.5:9b"        # zwalniany przed S2 i przywracany po (= llm.levels.l1_main)
+  save_dir: "~/Obrazy/jarvis"     # zapis tylko po jawnym „zapisz to"
   s2:
-    # Pull na żądanie, nie na starcie — encoder wizji zjada ~1,4 GB VRAM
-    # samą obecnością, na 8 GB to niedopuszczalne.
-    default_model: "qwen2.5vl:7b"      # domyślny: dobry OCR i rozumienie zrzutów
-    fast_model: "moondream"            # moondream2 (1,9 B / ~2 GB); tag w Ollamie: moondream
-    code_ui_model: ""                  # np. InternVL 2.5 8B — zrzuty kodu i UI
+    default_model: "qwen2.5vl:7b" # pull na żądanie, nie na starcie
+    fast_model: "moondream"       # moondream2 (1,9 B / ~2 GB); tag w Ollamie: moondream
+    code_ui_model: ""             # np. InternVL 2.5 8B — zrzuty kodu i UI
 
 privacy:
   # Gdy aktywne okno pasuje do wzorca → odmowa zrzutu i komunikat głosowy.
