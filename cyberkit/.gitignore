@@ -1,0 +1,7 @@
+# Cache Pythona
+__pycache__/
+*.py[cod]
+
+# Wygenerowane raporty (katalog zachowany przez .gitkeep)
+reports/*
+!reports/.gitkeep
